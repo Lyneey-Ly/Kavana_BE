@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import API from '../api';
 import Swal from 'sweetalert2'; // 🌟 SweetAlert2 Import
 
 function Register() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const fromBooking = location.state?.fromBooking;
+  const bookingData = location.state?.bookingData;
 
   // State Form Input
   const [name, setName] = useState('');
@@ -67,7 +71,7 @@ function Register() {
     setLoading(true);
 
     try {
-      await API.post('/customer/register', {
+      const res = await API.post('/customer/register', {
         name,
         email,
         phone,
@@ -76,17 +80,81 @@ function Register() {
         role,
       });
 
-      // 🌟 SweetAlert - Notifikasi Sukses Pendaftaran
+      const token = res.data.token || res.data.access_token;
+      const user = res.data.user;
+
+      if (token) {
+        sessionStorage.setItem('token', token);
+        API.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      }
+      if (user) {
+        sessionStorage.setItem('user', JSON.stringify(user));
+      }
+
+      // Jika pendaftaran ini terpicu dari proses booking di Detail Kamar
+      if (fromBooking && bookingData) {
+        try {
+          const bookingRes = await API.post('/pemesanan/booking', {
+            properti_id: bookingData.properti_id,
+            kamar_id: bookingData.kamar_id,
+            check_in_date: bookingData.check_in_date,
+            duration_months: bookingData.duration_months
+          });
+
+          const pemesananId = bookingRes.data?.data?.id || bookingRes.data?.id || bookingRes.data?.pemesanan_id;
+
+          const dataDikirim = {
+            pemesanan_id: pemesananId, 
+            property_id: bookingData.properti_id,
+            kamar_id: bookingData.kamar_id,
+            nomorKamar: bookingData.nomorKamar,
+            namaProperti: bookingData.namaProperti,
+            tipeKamar: bookingData.tipeKamar,
+            hargaSewa: bookingData.hargaSewa,
+            durasiSewa: bookingData.durasiSewaText,
+            tanggalMasuk: bookingData.tanggalMasukFormatted,
+            biayaLayanan: bookingData.biayaLayanan,
+            totalBayar: bookingData.totalBayar, 
+            gambar: bookingData.gambar
+          };
+
+          await Swal.fire({
+            icon: 'success',
+            title: 'Akun Berhasil Dibuat! 🎉',
+            text: 'Meneruskan ke halaman pembayaran...',
+            timer: 1800,
+            showConfirmButton: false,
+            customClass: { popup: 'rounded-2xl' }
+          });
+
+          navigate('/pembayaran', { state: { itemTransaksi: dataDikirim } });
+          return;
+        } catch (bookingErr) {
+          console.error('Error auto booking:', bookingErr);
+          const errMsg = bookingErr.response?.data?.message || 'Akun berhasil dibuat, tetapi gagal memproses booking.';
+          await Swal.fire({
+            icon: 'warning',
+            title: 'Akun Terbuat, Pemesanan Terkendala',
+            text: `${errMsg} Silakan lakukan pemesanan ulang dari halaman detail kamar.`,
+            confirmButtonColor: '#261C19',
+            customClass: { popup: 'rounded-2xl' }
+          });
+          navigate(`/kamar/${bookingData.properti_id}`);
+          return;
+        }
+      }
+
+      // 🌟 SweetAlert - Notifikasi Sukses Pendaftaran Biasa
       Swal.fire({
         icon: 'success',
         title: 'Pendaftaran Berhasil! 🎉',
-        text: 'Selamat datang di Kafana Vista. Mengalihkan ke halaman masuk...',
-        timer: 2000,
+        text: 'Selamat datang di Kafana Vista. Mengalihkan ke halaman beranda...',
+        timer: 1800,
         timerProgressBar: true,
         showConfirmButton: false,
         customClass: { popup: 'rounded-2xl' }
       }).then(() => {
-        navigate('/login');
+        navigate('/Home');
       });
 
     } catch (error) {
@@ -169,9 +237,32 @@ function Register() {
           <div className="w-full max-w-[390px] mx-auto my-auto space-y-5">
             
             <div className="text-center space-y-1">
-              <h2 className="text-2xl font-black tracking-tight text-[#261C19]">Buat Akun Baru</h2>
-              <p className="text-xs text-gray-500 font-medium">Lengkapi data diri untuk pengalaman akses penuh.</p>
+              <h2 className="text-2xl font-black tracking-tight text-[#261C19]">
+                {fromBooking ? 'Buat Akun untuk Pemesanan' : 'Buat Akun Baru'}
+              </h2>
+              <p className="text-xs text-gray-500 font-medium">
+                {fromBooking ? 'Lengkapi data diri Anda untuk menyelesaikan pemesanan kamar.' : 'Lengkapi data diri untuk pengalaman akses penuh.'}
+              </p>
             </div>
+
+            {/* BANNER RINGKASAN BOOKING BILA DATANG DARI DETAIL KAMAR */}
+            {fromBooking && bookingData && (
+              <div className="bg-[#FAF5EF] border-2 border-[#B38E5D] p-3.5 rounded-2xl space-y-2 text-xs shadow-sm">
+                <div className="flex items-center gap-2 font-bold text-[#261C19]">
+                  <span className="text-sm">🏢</span>
+                  <span className="truncate">{bookingData.namaProperti}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 text-[11px] text-gray-600 font-medium bg-white/80 p-2.5 rounded-xl border border-[#D7C4B0]/60">
+                  <p>Unit: <span className="font-bold text-[#B38E5D]">{bookingData.nomorKamar}</span></p>
+                  <p>Durasi: <span className="font-bold text-[#261C19]">{bookingData.durasiSewaText}</span></p>
+                  <p>Check-in: <span className="font-bold text-[#261C19]">{bookingData.tanggalMasukFormatted}</span></p>
+                  <p>Total: <span className="font-bold text-emerald-700">{bookingData.totalBayar}</span></p>
+                </div>
+                <p className="text-[10px] text-[#B38E5D] font-bold text-center pt-0.5">
+                  ✨ Setelah mendaftar, Anda akan langsung diarahkan ke Pembayaran!
+                </p>
+              </div>
+            )}
 
             <form onSubmit={handleRegister} className="space-y-3.5">
               
@@ -316,7 +407,7 @@ function Register() {
 
             <div className="text-center text-xs font-medium text-gray-500 pt-2">
               <span>Sudah memiliki akun? </span>
-              <Link to="/login" className="font-extrabold text-[#261C19] hover:text-[#B38E5D] underline transition">
+              <Link to="/login" state={location.state} className="font-extrabold text-[#261C19] hover:text-[#B38E5D] underline transition">
                 Masuk di sini
               </Link>
             </div>

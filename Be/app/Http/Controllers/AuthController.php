@@ -44,6 +44,63 @@ class AuthController extends Controller
         ], 201);
     }
 
+    /**
+     * 🌟 UNIFIED LOGIN (Otomatis Cek Role User, Admin, atau SuperAdmin)
+     */
+    public function login(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+
+        // 1. Cek di tabel Administrator dulu
+        $admin = Administrator::where('email', $request->email)->first();
+        if ($admin && Hash::check($request->password, $admin->password)) {
+            $admin->tokens()->delete();
+            $token = $admin->createToken('admin_token')->plainTextToken;
+
+            $userRole = strtolower($admin->role ?? 'admin');
+            $redirectRole = in_array($userRole, ['superadmin', 'super_admin', 'super admin']) ? 'superadmin' : 'admin';
+
+            return response()->json([
+                'message' => 'Login berhasil!',
+                'token' => $token,
+                'token_type' => 'Bearer',
+                'role' => $redirectRole,
+                'user' => $admin
+            ], 200);
+        }
+
+        // 2. Cek di tabel User
+        $user = User::where('email', $request->email)->first();
+        if ($user && Hash::check($request->password, $user->password)) {
+            $user->tokens()->delete();
+            $token = $user->createToken('user_token')->plainTextToken;
+
+            $userRole = strtolower($user->role ?? 'customer');
+            if (in_array($userRole, ['superadmin', 'super_admin', 'super admin'])) {
+                $redirectRole = 'superadmin';
+            } elseif (in_array($userRole, ['admin', 'pemilik', 'owner'])) {
+                $redirectRole = 'admin';
+            } else {
+                $redirectRole = 'customer';
+            }
+
+            return response()->json([
+                'message' => 'Login berhasil!',
+                'token' => $token,
+                'token_type' => 'Bearer',
+                'role' => $redirectRole,
+                'user' => $user
+            ], 200);
+        }
+
+        return response()->json([
+            'message' => 'Email atau password yang Anda masukkan salah.'
+        ], 401);
+    }
+
     public function loginCustomer(Request $request)
     {
         $request->validate([

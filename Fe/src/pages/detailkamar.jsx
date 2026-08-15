@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import Swal from 'sweetalert2'; // 🌟 Ditambahkan: SweetAlert2 untuk Alert Interaktif
+import Swal from 'sweetalert2';
 import API from '../api';
 
 export default function DetailKamar() {
@@ -13,17 +13,15 @@ export default function DetailKamar() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // 🌟 State untuk Tanggal Masuk (Mulai Sewa)
-  const todayStr = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
+  // State Tanggal Masuk & Transaksi
+  const todayStr = new Date().toISOString().split('T')[0];
   const [tanggalMasuk, setTanggalMasuk] = useState(todayStr);
-
-  // State Tampilan & Transaksi
   const [activeImage, setActiveImage] = useState('');
   const [durasiSewa, setDurasiSewa] = useState(1);
   const [selectedKamar, setSelectedKamar] = useState(null);
 
-  // 🌟 Filter Kamar, Lightbox Foto, Wishlist, & Toast Notifikasi
-  const [filterKamar, setFilterKamar] = useState('semua'); // 'semua' | 'tersedia' | 'terisi'
+  // State Filter, Lightbox, & Wishlist
+  const [filterKamar, setFilterKamar] = useState('semua');
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
@@ -35,13 +33,15 @@ export default function DetailKamar() {
   const [newComment, setNewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
 
-  // Helper Notifikasi Toast Bawaan (Tetap Dipertahankan)
-  const showToast = (message, type = 'info') => {
-    setToast({ show: true, message, type });
-    setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 3500);
-  };
+  // 🌟 State Modal Dokumen Sewa & TTD Canvas
+  const [showDokumenModal, setShowDokumenModal] = useState(false);
+  const [bookingResponse, setBookingResponse] = useState(null);
+  const [isAgreed, setIsAgreed] = useState(false);
+  const [hasSigned, setHasSigned] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const canvasRef = useRef(null);
 
-  // 🌟 SweetAlert Toast Notification Helper
+  // Helper Toast Notification
   const showSwalToast = (icon, title) => {
     Swal.fire({
       toast: true,
@@ -56,14 +56,12 @@ export default function DetailKamar() {
     });
   };
 
-  // Helper konversi angka yang tahan terhadap desimal database (.00)
+  // Helper Konversi Angka & Format Rupiah
   const parsePriceNumber = (priceVal) => {
     if (typeof priceVal === 'number') return Math.round(priceVal);
     if (!priceVal) return 0;
     
-    let str = String(priceVal).trim();
-    str = str.replace(/\.00?$/, '');
-    
+    let str = String(priceVal).trim().replace(/\.00?$/, '');
     const cleanStr = str.replace(/[^0-9]/g, '');
     const num = Number(cleanStr) || 0;
 
@@ -73,7 +71,6 @@ export default function DetailKamar() {
     return num;
   };
 
-  // Helper Format Rupiah
   const formatRupiah = (angka) => {
     return new Intl.NumberFormat('id-ID', { 
       style: 'currency', 
@@ -82,7 +79,7 @@ export default function DetailKamar() {
     }).format(angka || 0);
   };
 
-  // 🌟 PERBAIKAN FORMAT GAMBAR: Menangani foto lokal, server Laravel, dan fallback
+  // Format Gambar URL
   const formatImage = (imgSrc) => {
     if (!imgSrc) return 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80';
     if (imgSrc.startsWith('http://') || imgSrc.startsWith('https://') || imgSrc.startsWith('data:')) {
@@ -94,83 +91,50 @@ export default function DetailKamar() {
     return `http://127.0.0.1:8000/storage/${imgSrc}`;
   };
 
-  // Pengecekan status kamar yang akurat dengan backend Laravel
+  // Cek Status Kamar Terisi
   const checkIsTerisi = (kamar) => {
     if (!kamar) return false;
-    
     if (kamar.is_available !== undefined && kamar.is_available !== null) {
       const avail = String(kamar.is_available).toLowerCase().trim();
       return avail === '0' || avail === 'false' || avail === 'no';
     }
-
     const status = kamar.status !== undefined ? kamar.status : (kamar.keterangan || '');
-    if (status === undefined || status === null || status === '') return false;
+    if (!status) return false;
     if (typeof status === 'boolean') return !status;
     if (typeof status === 'number') return status === 0;
 
     const str = String(status).toLowerCase().trim();
-    return (
-      str === 'terisi' || 
-      str === 'occupied' || 
-      str === 'booked' || 
-      str === 'full' || 
-      str === '1' || 
-      str === 'true' || 
-      str === 'tidak tersedia' || 
-      str === 'dipesan' ||
-      str === 'terpesan' ||
-      str === 'unavailable' ||
-      str === '0'
-    );
+    return ['terisi', 'occupied', 'booked', 'full', '1', 'true', 'tidak tersedia', 'dipesan', 'terpesan', 'unavailable', '0'].includes(str);
   };
-const mapBackendProperti = (data) => {
+
+  // Mapping Data Properti dari Backend
+  const mapBackendProperti = (data) => {
     if (!data) return null;
 
     const mainImg = formatImage(data.main_image || data.image || data.gambar || data.foto || data.foto_utama);
-    
-    // 🌟 1. Tangkap semua kemungkinan nama key galeri dari response Laravel Backend
-    let rawGaleri = 
-      data.images || 
-      data.gallery_images || // 👈 Tambahkan ini agar cocok dengan form Admin
-      data.galeri || 
-      data.galleries || 
-      data.gallery || 
-      data.photos || 
-      data.property_images || 
-      data.foto_galeri;
+    let rawGaleri = data.images || data.gallery_images || data.galeri || data.galleries || data.photos || data.foto_galeri;
 
-    // 🌟 2. Jika database menyimpan galeri dalam bentuk string JSON (contoh: '["img1.jpg", "img2.jpg"]')
     if (typeof rawGaleri === 'string') {
       try {
         rawGaleri = JSON.parse(rawGaleri);
       } catch (e) {
-        if (rawGaleri.includes(',')) {
-          rawGaleri = rawGaleri.split(',').map(s => s.trim());
-        } else {
-          rawGaleri = [rawGaleri];
-        }
+        rawGaleri = rawGaleri.includes(',') ? rawGaleri.split(',').map(s => s.trim()) : [rawGaleri];
       }
     }
 
-    // 🌟 3. Ekstrak path/URL foto galeri baik yang berbentuk Array String maupun Array Objek Relasi
     let galeriList = [];
     if (Array.isArray(rawGaleri) && rawGaleri.length > 0) {
       galeriList = rawGaleri.map(img => {
         if (!img) return null;
-        
-        // Jika item langsung berupa string path ("uploads/kamar1.jpg")
         if (typeof img === 'string') return formatImage(img);
-        
-        // Jika item berupa Objek dari Database (contoh: { id: 1, image_path: "..." })
         if (typeof img === 'object') {
-          const path = img.url || img.path || img.image_path || img.file_path || img.image || img.foto || img.src || img.file;
+          const path = img.url || img.path || img.image_path || img.file_path || img.image || img.foto;
           return path ? formatImage(path) : null;
         }
         return null;
-      }).filter(Boolean); // Menghapus nilai null / undefined
+      }).filter(Boolean);
     }
 
-    // 🌟 4. Gabungkan foto utama ke dalam galeri jika belum ada
     if (galeriList.length === 0) {
       galeriList = [mainImg];
     } else if (!galeriList.includes(mainImg)) {
@@ -191,15 +155,7 @@ const mapBackendProperti = (data) => {
       : `https://ui-avatars.com/api/?name=${encodeURIComponent(namaPemilik)}&background=2D2321&color=FAF5EF`;
 
     const rawFacilities = parseList(data.facilities || data.room_facilities || data.fasilitas);
-
-    const rawKamars = Array.isArray(data.kamars) ? data.kamars 
-      : Array.isArray(data.kamar) ? data.kamar 
-      : Array.isArray(data.rooms) ? data.rooms 
-      : Array.isArray(data.room_list) ? data.room_list 
-      : [];
-
-    const totalKamarDirect = Number(data.total_kamar || data.jumlah_kamar || data.total_rooms || 0);
-    const sisaKamarDirect = Number(data.sisa_kamar || data.kamar_tersedia || data.available_rooms || 0);
+    const rawKamars = Array.isArray(data.kamars) ? data.kamars : Array.isArray(data.kamar) ? data.kamar : [];
 
     const hargaAsli = parsePriceNumber(data.price_per_month ?? data.harga ?? data.price);
     const depositAsli = data.deposit !== undefined && data.deposit !== null ? parsePriceNumber(data.deposit) : hargaAsli;
@@ -214,39 +170,30 @@ const mapBackendProperti = (data) => {
       biayaLayanan: biayaLayananAsli,
       deposit: depositAsli,
       gambarUtama: mainImg,
-      galeri: galeriList, // 🌟 Galeri yang sudah berhasil diekstrak
+      galeri: galeriList,
       deskripsi: data.description || 'Tidak ada deskripsi tersedia.',
       fasilitasKamar: rawFacilities.length > 0 ? rawFacilities : ['Kamar Mandi Dalam', 'Kasur & Lemari', 'Meja Belajar'],
       fasilitasBersama: parseList(data.public_facilities || data.fasilitas_bersama),
-      aturanKos: parseList(data.rules || data.aturan || data.aturan_kos || 'Dilarang membawa orang hitam, Dilarang membakar kamar, Dilarang mematuhi peraturan'),
-      pemilik: {
-        nama: namaPemilik,
-        noHp: hpPemilik,
-        foto: fotoPemilik
-      },
+      aturanKos: parseList(data.rules || data.aturan || data.aturan_kos || 'Dilarang merusak fasilitas, Wajib menjaga kebersihan, Dilarang membuat kegaduhan'),
+      pemilik: { nama: namaPemilik, noHp: hpPemilik, foto: fotoPemilik },
       kamars: rawKamars,
-      totalKamarDirect,
-      sisaKamarDirect
+      totalKamarDirect: Number(data.total_kamar || 0),
+      sisaKamarDirect: Number(data.sisa_kamar || 0)
     };
   };
 
-  // 1. Fetch Detail Properti
+  // Fetch Detail Properti
   useEffect(() => {
     const loadPropertiDetail = async () => {
       setLoading(true);
-      setErrorMsg('');
-
       if (id) {
         try {
           const res = await API.get(`/properties/${id}`);
-          const rawData = res.data?.data || res.data?.property || res.data;
-          const formatted = mapBackendProperti(rawData);
-          
+          const formatted = mapBackendProperti(res.data?.data || res.data?.property || res.data);
           setProperti(formatted);
           setActiveImage(formatted.gambarUtama);
         } catch (err) {
-          console.error('❌ Gagal memuat detail dari API:', err);
-          const stateRoom = location.state?.room || location.state?.properti || location.state?.item;
+          const stateRoom = location.state?.room || location.state?.properti;
           if (stateRoom) {
             const formatted = mapBackendProperti(stateRoom);
             setProperti(formatted);
@@ -257,23 +204,18 @@ const mapBackendProperti = (data) => {
         } finally {
           setLoading(false);
         }
-      } else {
-        setErrorMsg('ID Properti tidak valid.');
-        setLoading(false);
       }
     };
-
     loadPropertiDetail();
   }, [id]);
 
-  // 2. Fetch Review
+  // Fetch Review
   const fetchReviews = async (propertyId) => {
     if (!propertyId) return;
     setLoadingReviews(true);
     try {
       const res = await API.get(`/properties/${propertyId}/reviews`);
-      const apiReviews = res.data?.data || res.data?.reviews || (Array.isArray(res.data) ? res.data : []);
-      setReviews(apiReviews);
+      setReviews(res.data?.data || res.data?.reviews || (Array.isArray(res.data) ? res.data : []));
     } catch (err) {
       setReviews([]);
     } finally {
@@ -282,49 +224,25 @@ const mapBackendProperti = (data) => {
   };
 
   useEffect(() => {
-    if (properti?.id) {
-      fetchReviews(properti.id);
-    }
+    if (properti?.id) fetchReviews(properti.id);
   }, [properti?.id]);
 
-  // 3. Submit Review dengan SweetAlert
+  // Submit Review
   const handleSubmitReview = async (e) => {
     e.preventDefault();
     if (!newComment.trim()) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Ulasan Kosong',
-        text: 'Silakan tulis ulasan kamu terlebih dahulu!',
-        confirmButtonColor: '#2D2321',
-      });
+      Swal.fire({ icon: 'warning', title: 'Ulasan Kosong', text: 'Tulis ulasan terlebih dahulu!', confirmButtonColor: '#2D2321' });
       return;
     }
-
     setSubmittingReview(true);
     try {
-      await API.post('/reviews', {
-        properti_id: properti.id, 
-        rating: newRating,
-        comment: newComment
-      });
-
-      Swal.fire({
-        icon: 'success',
-        title: 'Ulasan Terkirim!',
-        text: 'Terima kasih telah memberikan ulasan.',
-        confirmButtonColor: '#B38E5D',
-      });
-
+      await API.post('/reviews', { properti_id: properti.id, rating: newRating, comment: newComment });
+      Swal.fire({ icon: 'success', title: 'Ulasan Terkirim!', confirmButtonColor: '#B38E5D' });
       setNewComment('');
       setNewRating(5);
       fetchReviews(properti.id);
     } catch (err) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Gagal Mengirim',
-        text: err.response?.data?.message || 'Gagal mengirim ulasan.',
-        confirmButtonColor: '#2D2321',
-      });
+      Swal.fire({ icon: 'error', title: 'Gagal Mengirim', text: err.response?.data?.message || 'Terjadi kesalahan.', confirmButtonColor: '#2D2321' });
     } finally {
       setSubmittingReview(false);
     }
@@ -343,25 +261,15 @@ const mapBackendProperti = (data) => {
   const subtotalSewa = rawSubtotal - discountAmount;
   const totalPembayaran = subtotalSewa + (properti?.biayaLayanan || 0);
 
-  // Kalkulasi Informasi Kamar
+  // Status Kamar
   const kamarsList = properti?.kamars || [];
   const hasKamarsArray = kamarsList.length > 0;
-
   const totalKamar = hasKamarsArray ? kamarsList.length : (properti?.totalKamarDirect || 0);
-  const kamarTerisi = hasKamarsArray 
-    ? kamarsList.filter(k => checkIsTerisi(k)).length 
-    : Math.max(0, totalKamar - (properti?.sisaKamarDirect || 0));
-  const kamarSisa = hasKamarsArray 
-    ? Math.max(0, totalKamar - kamarTerisi)
-    : (properti?.sisaKamarDirect || 0);
+  const kamarTerisi = hasKamarsArray ? kamarsList.filter(k => checkIsTerisi(k)).length : Math.max(0, totalKamar - (properti?.sisaKamarDirect || 0));
+  const kamarSisa = hasKamarsArray ? Math.max(0, totalKamar - kamarTerisi) : (properti?.sisaKamarDirect || 0);
 
-  const infoKamar = {
-    total: totalKamar,
-    terisi: kamarTerisi,
-    sisa: kamarSisa,
-  };
+  const infoKamar = { total: totalKamar, terisi: kamarTerisi, sisa: kamarSisa };
 
-  // Filter List Kamar
   const filteredKamarsList = kamarsList.filter(kamar => {
     const isOccupied = checkIsTerisi(kamar);
     if (filterKamar === 'tersedia') return !isOccupied;
@@ -369,7 +277,50 @@ const mapBackendProperti = (data) => {
     return true;
   });
 
-  // 🌟 Modifikasi Pembayaran dengan SweetAlert2 Modal & Toast
+  // 🖊️ LOGIKA CANVAS TANDA TANGAN DIGITAL (TTD)
+  const startDrawing = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+    const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+    
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#2D2321';
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    setIsDrawing(true);
+    setHasSigned(true);
+  };
+
+  const draw = (e) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+    const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+    
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasSigned(false);
+  };
+
+  // 🚀 PROSES 1: KLIK SEWA -> BUAT BOOKING & MUNCULKAN DOKUMEN SEWA + TTD
   const handleLanjutPembayaran = async () => {
     if (!properti) return;
 
@@ -393,30 +344,48 @@ const mapBackendProperti = (data) => {
       return;
     }
 
-    // Konfirmasi dengan SweetAlert2 sebelum memproses pemesanan
-    const result = await Swal.fire({
-      title: 'Konfirmasi Pemesanan',
-      html: `
-        <div style="text-align: left; font-size: 13px; font-family: sans-serif;">
-          <p><strong>Kost:</strong> ${properti.namaProperti}</p>
-          <p><strong>Kamar:</strong> ${selectedKamar ? (selectedKamar.nomor_kamar || selectedKamar.nama_kamar || selectedKamar.room_number) : 'Sesuai Ketersediaan'}</p>
-          <p><strong>Mulai Check-in:</strong> ${new Date(tanggalMasuk).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
-          <p><strong>Total Estimasi:</strong> ${formatRupiah(totalPembayaran)}</p>
-        </div>
-      `,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonColor: '#2D2321',
-      cancelButtonColor: '#d33',
-      confirmButtonText: 'Lanjutkan Bayar',
-      cancelButtonText: 'Batal'
-    });
+    // Status Login
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      const bookingData = {
+        properti_id: properti.id,
+        kamar_id: selectedKamar ? selectedKamar.id : null,
+        check_in_date: tanggalMasuk,
+        duration_months: durasiSewa,
+        nomorKamar: selectedKamar ? (selectedKamar.nomor_kamar || selectedKamar.nama_kamar) : '-',
+        namaProperti: properti.namaProperti,
+        tipeKamar: properti.kategori,
+        hargaSewa: `${formatRupiah(properti.hargaPerBulan)} / bln`,
+        durasiSewaText: `${durasiSewa} Bulan`,
+        tanggalMasukFormatted: new Date(tanggalMasuk).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }),
+        biayaLayanan: formatRupiah(properti.biayaLayanan),
+        totalBayar: formatRupiah(totalPembayaran), 
+        gambar: properti.gambarUtama
+      };
 
-    if (!result.isConfirmed) return;
+      const result = await Swal.fire({
+        title: 'Belum Login',
+        text: 'Untuk melanjutkan ke pembuatan dokumen sewa, silakan masuk ke akun Anda.',
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonColor: '#B38E5D',
+        cancelButtonColor: '#2D2321',
+        confirmButtonText: '📝 Buat Akun Baru',
+        cancelButtonText: '🔑 Masuk (Login)'
+      });
+
+      if (result.isConfirmed) {
+        navigate('/register', { state: { fromBooking: true, bookingData } });
+      } else if (result.dismiss === Swal.DismissReason.cancel) {
+        navigate('/login', { state: { fromBooking: true, bookingData } });
+      }
+      return;
+    }
 
     try {
       Swal.showLoading();
 
+      // Panggil API untuk membuat Pemesanan & Draft Dokumen Sewa
       const response = await API.post('/pemesanan/booking', {
         properti_id: properti.id,
         kamar_id: selectedKamar ? selectedKamar.id : null,
@@ -424,47 +393,88 @@ const mapBackendProperti = (data) => {
         duration_months: durasiSewa,    
       });
 
-      const pemesananId = response.data?.data?.id || response.data?.id || response.data?.pemesanan_id;
+      Swal.close();
 
-      const dataDikirim = {
-        pemesanan_id: pemesananId, 
-        property_id: properti.id,
-        kamar_id: selectedKamar ? selectedKamar.id : null,
-        nomorKamar: selectedKamar ? (selectedKamar.nomor_kamar || selectedKamar.nama_kamar || selectedKamar.room_number) : '-',
-        namaProperti: properti.namaProperti,
-        tipeKamar: properti.kategori,
-        hargaSewa: `${formatRupiah(properti.hargaPerBulan)} / bln`,
-        durasiSewa: `${durasiSewa} Bulan`,
-        tanggalMasuk: new Date(tanggalMasuk).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }),
-        biayaLayanan: formatRupiah(properti.biayaLayanan),
-        totalBayar: formatRupiah(totalPembayaran), 
-        gambar: properti.gambarUtama
-      };
-
-      Swal.fire({
-        icon: 'success',
-        title: 'Pemesanan Berhasil!',
-        text: 'Meneruskan ke halaman pembayaran...',
-        timer: 1500,
-        showConfirmButton: false
-      });
-
-      setTimeout(() => {
-        navigate('/pembayaran', { state: { itemTransaksi: dataDikirim } });
-      }, 1200);
+      // Simpan data booking ke state dan buka modal Dokumen Sewa + TTD
+      setBookingResponse(response.data?.data || response.data);
+      setShowDokumenModal(true);
+      setIsAgreed(false);
+      setHasSigned(false);
 
     } catch (err) {
       console.error('❌ Gagal membuat pemesanan:', err);
-      const errorMessage = err.response?.data?.message || err.response?.data?.error || 'Gagal membuat pesanan. Cek kembali pilihan kamar atau tanggal masuk.';
-      
       Swal.fire({
         icon: 'error',
         title: 'Pemesanan Gagal',
-        text: errorMessage,
+        text: err.response?.data?.message || 'Gagal memproses pesanan.',
         confirmButtonColor: '#2D2321',
       });
     }
   };
+
+  const handleSelesaiTTDDanLanjutBayar = async () => {
+  if (!isAgreed) {
+    Swal.fire({ icon: 'warning', title: 'Persetujuan Diperlukan', text: 'Harap centang kotak persetujuan dokumen sewa terlebih dahulu.', confirmButtonColor: '#2D2321' });
+    return;
+  }
+
+  if (!hasSigned) {
+    Swal.fire({ icon: 'warning', title: 'Tanda Tangan Belum Ada', text: 'Silakan bubuhkan tanda tangan Anda pada area yang disediakan.', confirmButtonColor: '#2D2321' });
+    return;
+  }
+
+  const signatureImage = canvasRef.current ? canvasRef.current.toDataURL() : null;
+
+  try {
+    Swal.showLoading();
+
+    // 🌟 SIMPAN TTD PERMANEN KE DATABASE BACKEND
+    await API.post(`/pemesanan/${bookingResponse?.id}/ttd`, {
+      signature: signatureImage,
+      is_agreed: true
+    });
+
+    Swal.close();
+
+    const dataDikirim = {
+      pemesanan_id: bookingResponse?.id, 
+      property_id: properti.id,
+      kamar_id: selectedKamar ? selectedKamar.id : null,
+      nomorKamar: selectedKamar ? (selectedKamar.nomor_kamar || selectedKamar.nama_kamar) : '-',
+      namaProperti: properti.namaProperti,
+      tipeKamar: properti.kategori,
+      hargaSewa: `${formatRupiah(properti.hargaPerBulan)} / bln`,
+      durasiSewa: `${durasiSewa} Bulan`,
+      tanggalMasuk: new Date(tanggalMasuk).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }),
+      biayaLayanan: formatRupiah(properti.biayaLayanan),
+      totalBayar: formatRupiah(totalPembayaran), 
+      gambar: properti.gambarUtama,
+      signatureImage: signatureImage
+    };
+
+    setShowDokumenModal(false);
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Tanda Tangan Tersimpan!',
+      text: 'Meneruskan ke halaman pembayaran...',
+      timer: 1200,
+      showConfirmButton: false
+    });
+
+    setTimeout(() => {
+      navigate('/pembayaran', { state: { itemTransaksi: dataDikirim } });
+    }, 1000);
+
+  } catch (err) {
+    Swal.fire({
+      icon: 'error',
+      title: 'Gagal Menyimpan TTD',
+      text: err.response?.data?.message || 'Gagal menyimpan tanda tangan ke server.',
+      confirmButtonColor: '#2D2321'
+    });
+  }
+};
 
   const handleImageError = (e) => {
     e.target.onerror = null;
@@ -476,7 +486,7 @@ const mapBackendProperti = (data) => {
       <div className="min-h-screen bg-[#FAF5EF] flex items-center justify-center p-6">
         <div className="text-center space-y-3">
           <div className="w-10 h-10 border-4 border-[#B38E5D] border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs font-bold uppercase tracking-widest text-[#2D2321]">Memuat Detail Properti dari Server...</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-[#2D2321]">Memuat Detail Properti...</p>
         </div>
       </div>
     );
@@ -503,13 +513,9 @@ const mapBackendProperti = (data) => {
   return (
     <div className="min-h-screen bg-[#FAF5EF] text-[#2D2321] font-sans antialiased pb-20 selection:bg-[#B38E5D] selection:text-white relative">
       
-      {/* TOAST NOTIFICATION FLOATING BAWAAN */}
+      {/* TOAST NOTIFICATION FLOATING */}
       {toast.show && (
-        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-2xl shadow-xl border flex items-center gap-3 transition-all duration-300 animate-bounce ${
-          toast.type === 'error' ? 'bg-rose-600 text-white border-rose-700' :
-          toast.type === 'success' ? 'bg-emerald-600 text-white border-emerald-700' :
-          'bg-[#2D2321] text-white border-[#B38E5D]'
-        }`}>
+        <div className="fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-2xl shadow-xl border flex items-center gap-3 transition-all bg-[#2D2321] text-white border-[#B38E5D]">
           <span className="text-sm font-bold">{toast.message}</span>
         </div>
       )}
@@ -522,17 +528,107 @@ const mapBackendProperti = (data) => {
         </div>
       )}
 
+      {/* 📜 POP-UP MODAL DOKUMEN SEWA & TTD DIGITAL */}
+      {showDokumenModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white border border-[#D7C4B0] max-w-2xl w-full rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl relative my-8">
+            <button 
+              onClick={() => setShowDokumenModal(false)}
+              className="absolute top-5 right-5 text-gray-400 hover:text-black text-xl font-bold p-2 cursor-pointer"
+            >
+              ✕
+            </button>
+
+            <div className="border-b border-slate-100 pb-3">
+              <span className="bg-[#B38E5D]/10 text-[#B38E5D] text-[10px] font-extrabold uppercase px-3 py-1 rounded-full border border-[#B38E5D]/20">
+                Tahap 2: Dokumen Legal
+              </span>
+              <h2 className="text-xl font-serif font-bold text-[#2D2321] mt-2">
+                Surat Perjanjian Sewa Hunian
+              </h2>
+              <p className="text-xs text-gray-500">
+                Harap baca klausul perjanjian sewa dan bubuhkan tanda tangan Anda sebelum lanjut membayar.
+              </p>
+            </div>
+
+            {/* Teks Perjanjian Sewa */}
+            <div className="bg-[#FAF5EF] p-4 sm:p-5 rounded-2xl border border-[#D7C4B0] text-xs text-[#2D2321] leading-relaxed max-h-56 overflow-y-auto whitespace-pre-line shadow-inner">
+              {bookingResponse?.dokumen_sewa?.lease_agreement || bookingResponse?.dokumenSewa?.lease_agreement || (
+                `SURAT PERJANJIAN SEWA HUNIAN KAFANA\n\nPada hari ini, disepakati perjanjian sewa antara Management Kafana dengan Penyewa.\n\nRincian Sewa:\n- Properti: ${properti.namaProperti}\n- Unit Kamar: ${selectedKamar?.nomor_kamar || '-'}\n- Tanggal Check-In: ${tanggalMasuk}\n- Durasi: ${durasiSewa} Bulan\n- Total Biaya: ${formatRupiah(totalPembayaran)}\n\nDengan menandatangani dokumen ini, Penyewa menyatakan setuju dengan seluruh syarat dan ketentuan yang berlaku.`
+              )}
+            </div>
+
+            {/* Checkbox Persetujuan */}
+            <label className="flex items-start gap-3 cursor-pointer p-1">
+              <input 
+                type="checkbox" 
+                checked={isAgreed}
+                onChange={(e) => setIsAgreed(e.target.checked)}
+                className="w-4 h-4 mt-0.5 accent-[#2D2321] cursor-pointer"
+              />
+              <span className="text-xs font-semibold text-[#2D2321]">
+                Saya telah membaca, memahami, dan menyetujui seluruh klausul Surat Perjanjian Sewa di atas.
+              </span>
+            </label>
+
+            {/* Area Tanda Tangan Digital (Canvas) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-[#2D2321]">
+                  Bubuhkan Tanda Tangan Digital Anda:
+                </label>
+                <button
+                  type="button"
+                  onClick={clearCanvas}
+                  className="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer"
+                >
+                  🗑️ Hapus TTD
+                </button>
+              </div>
+
+              <div className="border-2 border-dashed border-[#D7C4B0] rounded-2xl bg-[#FAF5EF] overflow-hidden flex justify-center relative touch-none">
+                <canvas
+                  ref={canvasRef}
+                  width={500}
+                  height={150}
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  onTouchStart={startDrawing}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDrawing}
+                  className="cursor-crosshair w-full h-[150px]"
+                />
+                {!hasSigned && (
+                  <p className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 pointer-events-none">
+                    Goreskan Tanda Tangan Di Sini
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Tombol Eksekusi Modal */}
+            <button
+              onClick={handleSelesaiTTDDanLanjutBayar}
+              className="w-full py-4 bg-[#2D2321] hover:bg-[#B38E5D] text-white font-bold rounded-2xl text-xs uppercase tracking-widest transition shadow-lg cursor-pointer"
+            >
+              Simpan TTD &amp; Lanjut ke Pembayaran →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* TOP HEADER */}
       <div className="bg-white/90 backdrop-blur-md border-b border-[#D7C4B0] sticky top-0 z-30 shadow-sm transition-all">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <button 
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 bg-[#FAF5EF] hover:bg-[#2D2321] text-[#2D2321] hover:text-white px-4 py-2 rounded-full text-xs font-bold tracking-wider uppercase transition-all duration-300 border border-[#D7C4B0] cursor-pointer"
+            className="flex items-center gap-2 bg-[#FAF5EF] hover:bg-[#2D2321] text-[#2D2321] hover:text-white px-4 py-2 rounded-full text-xs font-bold tracking-wider uppercase transition border border-[#D7C4B0] cursor-pointer"
           >
             ← Kembali
           </button>
           
-          {/* ACTION BAR: SHARE & SIMPAN */}
           <div className="flex items-center gap-2">
             <button 
               onClick={() => {
@@ -589,7 +685,7 @@ const mapBackendProperti = (data) => {
           {/* KOLOM KIRI */}
           <div className="lg:col-span-7 space-y-6">
             
-            {/* 🌟 GALERI FOTO (DENGAN TAMPILAN PRESISI GAMBAR ADMIN) */}
+            {/* GALERI FOTO */}
             <div className="bg-white p-3 rounded-3xl border border-[#D7C4B0] shadow-sm space-y-3">
               <div 
                 onClick={() => setIsLightboxOpen(true)}
@@ -678,14 +774,13 @@ const mapBackendProperti = (data) => {
             {/* FASILITAS & PILIHAN KAMAR */}
             <div className="bg-white border border-[#D7C4B0] rounded-3xl p-6 shadow-sm space-y-6">
               
-              {/* STATUS & DENAH KAMAR INTERAKTIF */}
+              {/* DENAH KAMAR INTERAKTIF */}
               <div>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
                   <h3 className="font-serif font-bold text-[#B38E5D] text-xs uppercase tracking-wider flex items-center gap-1.5">
                     <span>🛏️</span> Pilih Unit Kamar Yang Tersedia
                   </h3>
 
-                  {/* FILTER KAMAR BUTTONS */}
                   <div className="flex bg-[#FAF5EF] p-1 rounded-xl border border-[#D7C4B0] text-[10px] font-bold">
                     <button 
                       onClick={() => setFilterKamar('semua')}
@@ -719,13 +814,12 @@ const mapBackendProperti = (data) => {
                   </p>
                 </div>
 
-                {/* GRID PILIHAN KAMAR */}
                 {properti.kamars && properti.kamars.length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3 mt-4">
                     {filteredKamarsList.map((kamar, idx) => {
                       const occupied = checkIsTerisi(kamar);
                       const isSelected = selectedKamar?.id === kamar.id;
-                      const nomorKamar = kamar.nomor_kamar || kamar.nama_kamar || kamar.room_number || kamar.nomor || `Kamar ${idx + 1}`;
+                      const nomorKamar = kamar.nomor_kamar || kamar.nama_kamar || kamar.room_number || `Kamar ${idx + 1}`;
                       
                       return (
                         <div
@@ -760,9 +854,7 @@ const mapBackendProperti = (data) => {
                 ) : (
                   <div className="bg-[#FAF5EF] p-6 rounded-2xl border border-dashed border-[#D7C4B0] text-center mt-2">
                     <p className="text-xs text-gray-500 font-medium">
-                      {infoKamar.total > 0 
-                        ? `Total ${infoKamar.total} kamar terdaftar (${infoKamar.sisa} tersedia), namun rincian denah belum dimasukkan oleh host.`
-                        : 'Data denah nomor kamar belum diisikan oleh pemilik kost.'}
+                      Data denah nomor kamar belum diisikan oleh pemilik kost.
                     </p>
                   </div>
                 )}
@@ -806,7 +898,7 @@ const mapBackendProperti = (data) => {
 
             </div>
 
-            {/* ATURAN HUNIAN */}
+            {/* ATURAN KOST */}
             {properti.aturanKos.length > 0 && (
               <div className="bg-amber-50/80 border border-amber-200 rounded-3xl p-6 shadow-sm space-y-3">
                 <h3 className="font-serif font-bold text-amber-900 text-xs uppercase tracking-wider flex items-center gap-2">
@@ -823,7 +915,7 @@ const mapBackendProperti = (data) => {
               </div>
             )}
 
-            {/* SECTION REVIEW & ULASAN */}
+            {/* SECTION REVIEW */}
             <div className="bg-white border border-[#D7C4B0] rounded-3xl p-6 shadow-sm space-y-6">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h3 className="font-serif font-bold text-[#2D2321] text-base flex items-center gap-2">
@@ -834,16 +926,14 @@ const mapBackendProperti = (data) => {
                 </span>
               </div>
 
-              {/* FORM TAMBAH REVIEW */}
               <form onSubmit={handleSubmitReview} className="bg-[#FAF5EF] p-5 rounded-2xl border border-[#D7C4B0]/80 space-y-3.5 shadow-inner">
                 <p className="text-xs font-bold text-[#2D2321]">Bagikan Pengalaman Kamu Tinggal Di Sini:</p>
-                
                 <div className="flex flex-wrap items-center gap-3">
                   <label className="text-xs text-gray-600 font-semibold">Beri Rating:</label>
                   <select 
                     value={newRating} 
                     onChange={(e) => setNewRating(Number(e.target.value))}
-                    className="bg-white border border-[#D7C4B0] text-xs font-bold px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B38E5D] shadow-sm cursor-pointer"
+                    className="bg-white border border-[#D7C4B0] text-xs font-bold px-3 py-2 rounded-xl cursor-pointer"
                   >
                     <option value={5}>⭐⭐⭐⭐⭐ (5 - Sangat Bagus)</option>
                     <option value={4}>⭐⭐⭐⭐ (4 - Bagus)</option>
@@ -858,49 +948,41 @@ const mapBackendProperti = (data) => {
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   placeholder="Ceritakan kebersihan, kenyamanan, atau kelebihan kost ini..."
-                  className="w-full bg-white border border-[#D7C4B0] p-3.5 rounded-xl text-xs text-[#2D2321] focus:outline-none focus:ring-2 focus:ring-[#B38E5D] shadow-sm"
+                  className="w-full bg-white border border-[#D7C4B0] p-3.5 rounded-xl text-xs text-[#2D2321]"
                 ></textarea>
 
                 <button
                   type="submit"
                   disabled={submittingReview}
-                  className="bg-[#2D2321] hover:bg-[#B38E5D] text-white px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer disabled:opacity-50 shadow-md hover:shadow-lg"
+                  className="bg-[#2D2321] hover:bg-[#B38E5D] text-white px-6 py-2.5 rounded-xl text-xs font-bold uppercase cursor-pointer transition"
                 >
                   {submittingReview ? 'Mengirim...' : 'Kirim Ulasan Sekarang'}
                 </button>
               </form>
 
-              {/* DAFTAR REVIEW */}
               {loadingReviews ? (
-                <div className="text-center py-6 space-y-2">
+                <div className="text-center py-6">
                   <div className="w-6 h-6 border-2 border-[#B38E5D] border-t-transparent rounded-full animate-spin mx-auto"></div>
-                  <p className="text-xs text-gray-400">Memuat ulasan dari penghuni...</p>
                 </div>
               ) : reviews.length > 0 ? (
                 <div className="space-y-4">
                   {reviews.map((rev, index) => (
-                    <div key={rev.id || index} className="p-4 rounded-2xl bg-[#FAF5EF]/60 border border-slate-200 space-y-1.5 transition hover:border-[#D7C4B0]">
+                    <div key={rev.id || index} className="p-4 rounded-2xl bg-[#FAF5EF]/60 border border-slate-200 space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-extrabold text-[#2D2321] flex items-center gap-1.5">
-                          <span className="w-5 h-5 rounded-full bg-[#B38E5D] text-white flex items-center justify-center text-[10px]">👤</span>
-                          {rev.user_name || rev.user?.name || rev.nama_user || 'Penyewa Anonim'}
+                          👤 {rev.user_name || rev.user?.name || 'Penyewa Anonim'}
                         </span>
-                        <span className="text-xs text-amber-500 font-bold tracking-wider">
+                        <span className="text-xs text-amber-500 font-bold">
                           {'★'.repeat(rev.rating || 5)}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-600 leading-relaxed pl-6">
-                        {rev.comment || rev.ulasan || rev.keterangan}
-                      </p>
-                      <span className="text-[10px] text-gray-400 pl-6 block pt-1">
-                        {rev.created_at ? new Date(rev.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Baru saja'}
-                      </span>
+                      <p className="text-xs text-gray-600 pl-6">{rev.comment || rev.ulasan}</p>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-400 text-xs bg-[#FAF5EF]/30 rounded-2xl border border-dashed border-[#D7C4B0]">
-                  Belum ada ulasan untuk properti ini. Jadilah penghuni pertama yang memberikan ulasan!
+                  Belum ada ulasan untuk properti ini.
                 </div>
               )}
             </div>
@@ -924,7 +1006,7 @@ const mapBackendProperti = (data) => {
                 </div>
               </div>
 
-              {/* TANGGAL MASUK (CHECK-IN) */}
+              {/* TANGGAL MASUK */}
               <div className="space-y-2">
                 <label className="text-xs text-[#2D2321] font-bold block">
                   Pilih Tanggal Masuk (Check-in):
@@ -934,19 +1016,18 @@ const mapBackendProperti = (data) => {
                   min={todayStr} 
                   value={tanggalMasuk}
                   onChange={(e) => setTanggalMasuk(e.target.value)}
-                  className="w-full bg-[#FAF5EF] border border-[#D7C4B0] text-[#2D2321] text-xs font-bold p-3.5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#B38E5D] cursor-pointer shadow-sm"
+                  className="w-full bg-[#FAF5EF] border border-[#D7C4B0] text-[#2D2321] text-xs font-bold p-3.5 rounded-2xl cursor-pointer"
                 />
-                <p className="text-[10px] text-gray-500 font-medium">Pilih kapan kamu mau mulai tempati kost ini.</p>
               </div>
 
-              {/* INFO KAMAR TERPILIH PADA CARD */}
-              <div className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs transition-all duration-300 ${
+              {/* KAMAR TERPILIH */}
+              <div className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs transition-all ${
                 selectedKamar ? 'bg-[#FAF5EF] border-[#B38E5D] ring-2 ring-[#B38E5D]/20' : 'bg-rose-50 border-rose-200'
               }`}>
                 <span className="font-bold text-[#5C4A42]">Unit Pilihan Kamu:</span>
                 {selectedKamar ? (
-                  <span className="bg-[#B38E5D] text-white font-extrabold px-3 py-1 rounded-xl shadow-sm animate-fadeIn">
-                    ✔ {selectedKamar.nomor_kamar || selectedKamar.nama_kamar || `Kamar ID ${selectedKamar.id}`}
+                  <span className="bg-[#B38E5D] text-white font-extrabold px-3 py-1 rounded-xl shadow-sm">
+                    ✔ {selectedKamar.nomor_kamar || selectedKamar.nama_kamar}
                   </span>
                 ) : (
                   <span className="text-rose-600 font-bold animate-pulse flex items-center gap-1">
@@ -955,21 +1036,22 @@ const mapBackendProperti = (data) => {
                 )}
               </div>
 
+              {/* DURASI SEWA */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-xs text-[#2D2321] font-bold block">
                     Pilih Durasi Sewa:
                   </label>
                   {discountRate > 0 && (
-                    <span className="bg-emerald-100 text-emerald-800 font-extrabold text-[10px] px-2 py-0.5 rounded-full animate-bounce">
-                      🔥 Hemat Diskon {(discountRate * 100)}%!
+                    <span className="bg-emerald-100 text-emerald-800 font-extrabold text-[10px] px-2 py-0.5 rounded-full">
+                      🔥 Diskon {(discountRate * 100)}%!
                     </span>
                   )}
                 </div>
                 <select 
                   value={durasiSewa} 
                   onChange={(e) => setDurasiSewa(Number(e.target.value))}
-                  className="w-full bg-[#FAF5EF] border border-[#D7C4B0] text-[#2D2321] text-xs font-bold p-3.5 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#B38E5D] cursor-pointer shadow-sm"
+                  className="w-full bg-[#FAF5EF] border border-[#D7C4B0] text-[#2D2321] text-xs font-bold p-3.5 rounded-2xl cursor-pointer"
                 >
                   <option value={1}>1 Bulan (Bayar Bulanan)</option>
                   <option value={3}>3 Bulan (Per Kuartal)</option>
@@ -979,7 +1061,7 @@ const mapBackendProperti = (data) => {
               </div>
 
               {/* RINCIAN BIAYA */}
-              <div className="bg-[#FAF5EF] p-4 rounded-2xl border border-[#D7C4B0]/80 space-y-3 text-xs shadow-inner">
+              <div className="bg-[#FAF5EF] p-4 rounded-2xl border border-[#D7C4B0]/80 space-y-3 text-xs">
                 <div className="flex justify-between text-[#5C4A42]">
                   <span>Sewa Kamar ({durasiSewa} bulan):</span>
                   <span className="font-semibold text-[#2D2321]">{formatRupiah(rawSubtotal)}</span>
@@ -993,10 +1075,7 @@ const mapBackendProperti = (data) => {
                 )}
 
                 <div className="flex justify-between text-[#5C4A42]">
-                  <span className="flex items-center gap-1">
-                    Biaya Layanan System: 
-                    <span title="Gratis atau menyesuaikan ketentuan sistem" className="cursor-help text-gray-400">ℹ️</span>
-                  </span>
+                  <span>Biaya Layanan System:</span>
                   <span className="font-semibold text-[#2D2321]">
                     {properti.biayaLayanan > 0 ? formatRupiah(properti.biayaLayanan) : <span className="text-emerald-600 font-bold">Gratis</span>}
                   </span>
@@ -1008,17 +1087,18 @@ const mapBackendProperti = (data) => {
                 </div>
               </div>
 
+              {/* TOMBOL SEWA & SETUJU DOKUMEN */}
               <button 
                 onClick={handleLanjutPembayaran}
-                className="w-full bg-[#2D2321] hover:bg-[#B38E5D] text-white font-bold py-4 rounded-2xl text-xs tracking-widest uppercase transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-2"
+                className="w-full bg-[#2D2321] hover:bg-[#B38E5D] text-white font-bold py-4 rounded-2xl text-xs tracking-widest uppercase transition-all shadow-lg cursor-pointer flex items-center justify-center gap-2"
               >
-                <span>Lanjut ke Pembayaran</span>
+                <span>Sewa &amp; Tanda Tangan Dokumen</span>
                 <span>→</span>
               </button>
 
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-[10px] text-center text-gray-500 leading-tight flex items-center justify-center gap-2">
                 <span>🔒</span>
-                <span>Pembayaran kamu 100% aman. Kamu belum akan ditagih sebelum memilih metode bayar di halaman berikutnya.</span>
+                <span>Dokumen sewa legal diterbitkan secara otomatis sebelum proses pembayaran.</span>
               </div>
 
             </div>

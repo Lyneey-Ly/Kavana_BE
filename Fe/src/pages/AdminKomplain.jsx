@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import API from '../api';
 import SidebarAdmin from '../components/SidebarAdmin';
+import Swal from 'sweetalert2';
 
 export default function AdminKomplain() {
   const [complaints, setComplaints] = useState([]);
@@ -23,6 +24,12 @@ export default function AdminKomplain() {
       setComplaints(res.data.data || []);
     } catch (err) {
       console.error('Gagal memuat komplain admin:', err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Memuat Data',
+        text: 'Terjadi kesalahan saat mengambil data komplain.',
+        confirmButtonColor: '#261C19'
+      });
     } finally {
       setLoading(false);
     }
@@ -49,12 +56,27 @@ export default function AdminKomplain() {
         tanggapan_admin: tanggapanAdmin
       });
 
-      alert('✨ Status & Tanggapan Komplain Berhasil Diperbarui!');
+      // SweetAlert Sukses
+      Swal.fire({
+        icon: 'success',
+        title: 'Berhasil Diperbarui!',
+        text: 'Status dan tanggapan komplain telah berhasil disimpan.',
+        confirmButtonColor: '#261C19',
+        timer: 2000
+      });
+
       setSelectedItem(null);
       fetchAdminComplaints();
     } catch (err) {
       console.error('Gagal mengupdate komplain:', err);
-      alert(err.response?.data?.message || 'Gagal memperbarui status komplain.');
+      
+      // SweetAlert Error
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Memperbarui',
+        text: err.response?.data?.message || 'Terjadi kesalahan saat memperbarui status komplain.',
+        confirmButtonColor: '#261C19'
+      });
     } finally {
       setSubmitting(false);
     }
@@ -125,7 +147,7 @@ export default function AdminKomplain() {
             </div>
             <button 
               onClick={fetchAdminComplaints}
-              className="bg-[#261C19] hover:bg-[#3D2D29] text-white px-5 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex items-center gap-2"
+              className="bg-[#261C19] hover:bg-[#3D2D29] text-white px-5 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex items-center gap-2 cursor-pointer"
             >
               <span>🔄</span> Refresh Data
             </button>

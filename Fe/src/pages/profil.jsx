@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { API_URL } from '../config'; // sesuaikan path-nya
+import { API_URL } from '../config'; 
 import { Link, useNavigate } from 'react-router-dom';
-import Swal from 'sweetalert2'; // 👈 Import SweetAlert2
+import Swal from 'sweetalert2'; 
 import API from '../api'; 
 import SidebarUser from '../components/SidebarUser';
+import Footer from '../components/footer';
 
 export default function UserProfile() {
   const navigate = useNavigate();
@@ -19,7 +20,7 @@ export default function UserProfile() {
 
   // Data dari API Backend
   const [user, setUser] = useState(null);
-  const [rentStatus, setRentStatus] = useState(null);
+  const [rentStatus, setRentStatus] = useState([]);
 
   // Form State untuk Edit Data
   const [formState, setFormState] = useState({
@@ -41,10 +42,15 @@ export default function UserProfile() {
       setLoading(true);
       const res = await API.get('/profile');
       const apiUser = res.data.data;
-      const apiSewa = res.data.status_sewa;
+      
+      // Normalisasi response status_sewa / sewa menjadi Array
+      const rawSewa = res.data.status_sewa || res.data.sewa || [];
+      const sewaList = Array.isArray(rawSewa) 
+        ? rawSewa 
+        : (rawSewa && typeof rawSewa === 'object' && Object.keys(rawSewa).length > 0 ? [rawSewa] : []);
 
       setUser(apiUser);
-      setRentStatus(apiSewa);
+      setRentStatus(sewaList);
 
       setFormState({
         name: apiUser?.name || '',
@@ -53,7 +59,7 @@ export default function UserProfile() {
         password: '',
       });
 
-      // Tambahkan timestamp agar browser memuat foto terbaru (Bypass Cache)
+      // Bypass cache browser untuk foto profil terbaru
       const timestamp = new Date().getTime();
       const backendPhotoUrl = apiUser?.foto
         ? (apiUser.foto.startsWith('http') 
@@ -85,7 +91,7 @@ export default function UserProfile() {
     fetchUserProfile();
   }, []);
 
-  // Handle Perubahan File Foto Profil dengan SweetAlert2
+  // Handle Perubahan File Foto Profil
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -136,7 +142,6 @@ export default function UserProfile() {
       setIsEditing(false);
       setSelectedFile(null);
       
-      // SweetAlert2 Notifikasi Sukses
       Swal.fire({
         icon: 'success',
         title: 'Berhasil!',
@@ -145,9 +150,7 @@ export default function UserProfile() {
         showConfirmButton: false
       });
 
-      // Refresh data profil setelah simpan
       await fetchUserProfile();
-
       setTimeout(() => setSuccessMessage(""), 4000);
     } catch (error) {
       console.error('Gagal update profil:', error);
@@ -171,34 +174,6 @@ export default function UserProfile() {
     } finally {
       setSaving(false);
     }
-  };
-
-  // Handle Logout dengan Konfirmasi SweetAlert2
-  const handleLogout = () => {
-    Swal.fire({
-      title: 'Konfirmasi Keluar',
-      text: 'Apakah Anda yakin ingin keluar dari sesi ini?',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#261C19',
-      cancelButtonColor: '#6e7881',
-      confirmButtonText: 'Ya, Keluar!',
-      cancelButtonText: 'Batal'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        localStorage.removeItem('token');
-        
-        Swal.fire({
-          icon: 'success',
-          title: 'Berhasil Keluar',
-          text: 'Anda telah keluar dari sistem.',
-          timer: 1500,
-          showConfirmButton: false
-        }).then(() => {
-          navigate('/login');
-        });
-      }
-    });
   };
 
   const formatDate = (dateString) => {
@@ -248,7 +223,6 @@ export default function UserProfile() {
               >
                 <span>🔍</span> Eksplor Hunian
               </Link>
-            
             </div>
           </header>
 
@@ -365,7 +339,7 @@ export default function UserProfile() {
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-[#261C19]">Proteksi Akun Aktif</h4>
-                      <p className="text-xs text-slate-400 font-medium">Sanctum Token & End-to-End Encrypted</p>
+                      <p className="text-xs text-slate-400 font-medium">Sanctum Token & Encrypted Session</p>
                     </div>
                   </div>
                   <span className="text-xs font-extrabold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full border border-emerald-200">
@@ -378,78 +352,126 @@ export default function UserProfile() {
               {/* SISI KANAN: STATUS SEWA & FORM EDIT (Col 8) */}
               <div className="lg:col-span-8 flex flex-col justify-between space-y-6">
                 
-                {/* KARTU STATUS HUNIAN */}
-                <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E5D7C5] shadow-sm transition hover:shadow-md space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-3">
+                {/* 🌟 KARTU STATUS HUNIAN (TAMPILAN TERBAIK & PREMIUM) 🌟 */}
+                {/* 🔴 PERUBAHAN DI SINI: p-6 dirubah jadi p-5 dan space-y-6 jadi space-y-4 agar lebih padat */}
+                <div className="bg-white p-5 rounded-3xl border border-[#E5D7C5] shadow-sm transition hover:shadow-md space-y-4">
+                  
+                  {/* HEADER KARTU */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-3">
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl p-2.5 bg-[#FAF6F0] rounded-2xl border border-[#E5D7C5]">🏡</span>
+                      <div className="w-10 h-10 rounded-xl bg-[#FAF6F0] border border-[#E5D7C5] flex items-center justify-center text-xl shadow-inner">
+                        🏢
+                      </div>
                       <div>
-                        <span className="text-[11px] font-black text-[#C5A059] uppercase tracking-widest block">Active Residential Pass</span>
-                        <h3 className="text-lg md:text-xl font-extrabold text-[#261C19]">Status Hunian Berjalan</h3>
+                        <span className="text-[10px] font-black text-[#C5A059] uppercase tracking-widest block">
+                          Active Residential Pass
+                        </span>
+                        <h3 className="text-base md:text-lg font-extrabold text-[#261C19]">
+                          Status Hunian Berjalan
+                        </h3>
                       </div>
                     </div>
-                    <span className={`self-start sm:self-center text-xs font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-xs ${
-                      rentStatus?.is_renting 
-                        ? 'bg-emerald-500 text-white shadow-emerald-500/20 shadow-lg' 
-                        : 'bg-slate-100 text-slate-600 border border-slate-200'
-                    }`}>
-                      {rentStatus?.keterangan || 'Tidak Ada Sewa'}
-                    </span>
+
+                    {/* STATUS BADGE DENGAN ANIMASI PULSATING DOT */}
+                    <div className="flex items-center gap-2 self-start sm:self-center bg-emerald-50 border border-emerald-200/80 px-3 py-1 rounded-full">
+                      <span className="relative flex h-2 w-2">
+                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${rentStatus.length > 0 ? 'bg-emerald-400' : 'bg-slate-400'} opacity-75`}></span>
+                        <span className={`relative inline-flex rounded-full h-2 w-2 ${rentStatus.length > 0 ? 'bg-emerald-500' : 'bg-slate-500'}`}></span>
+                      </span>
+                      <span className="text-[10px] md:text-xs font-black uppercase tracking-wider text-emerald-800">
+                        {rentStatus.length > 0 ? `${rentStatus.length} Unit Aktif Menyewa` : 'Tidak Ada Sewa Aktif'}
+                      </span>
+                    </div>
                   </div>
 
-                  {rentStatus?.is_renting ? (
-                    <div className="bg-gradient-to-br from-[#FAF6F0] via-white to-[#FAF6F0] p-6 rounded-2xl border border-[#E5D7C5] shadow-inner flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                      <div className="space-y-2.5 flex-grow">
-                        <div className="inline-block bg-[#261C19] text-[#E5D7C5] text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md">
-                          Verified Resident
-                        </div>
-                        <h4 className="text-lg md:text-xl font-black text-[#261C19]">{rentStatus?.title}</h4>
-                        <p className="text-xs md:text-sm text-slate-600 flex items-center gap-1.5">
-                          📍 {rentStatus?.address}
-                        </p>
-                        
-                        <div className="flex flex-wrap items-center gap-3 pt-2">
-                          <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200/80 text-xs text-slate-600 shadow-2xs">
-                            Check-in: <strong className="text-[#261C19] font-bold">{formatDate(rentStatus?.check_in_date)}</strong>
+                  {/* LIST HUNIAN DENGAN CARD MODERN */}
+                  {rentStatus.length > 0 ? (
+                    // 🔴 PERUBAHAN DI SINI: Tambah max-h dan overflow-y-auto kalau huniannya banyak biar gak makan layar
+                    <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
+                      {rentStatus.map((item, index) => {
+                        const cleanDuration = String(item.duration_months || '').replace(/bulan/gi, '').trim();
+
+                        return (
+                          // 🔴 PERUBAHAN DI SINI: padding dari p-6 jadi p-4, flex row dimajukan ke sm:flex-row
+                          <div 
+                            key={item.id || index} 
+                            className="group relative overflow-hidden bg-gradient-to-br from-[#FAF6F0] via-white to-[#F7F2EA] p-4 rounded-2xl border border-[#E5D7C5] hover:border-[#C5A059]/60 shadow-sm transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                          >
+                            {/* Aksen Emas Samping */}
+                            <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-[#C5A059] to-[#8F6E45]"></div>
+
+                            {/* DETAIL PROPERTI */}
+                            <div className="space-y-2 pl-2 flex-grow">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="bg-[#261C19] text-[#E5D7C5] text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md shadow-xs">
+                                  Verified Resident • Unit #{index + 1}
+                                </span>
+                                {item.kamar?.nomor_kamar && (
+                                  <span className="bg-[#C5A059]/15 text-[#8F6E45] border border-[#C5A059]/30 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md">
+                                    Kamar No. {item.kamar.nomor_kamar}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* 🔴 PERUBAHAN DI SINI: text lebih kecil */}
+                              <h4 className="text-base font-black text-[#261C19] group-hover:text-[#C5A059] transition-colors leading-tight">
+                                {item.title || item.properti?.nama_properti || item.nama_properti || "Unit Kost Kafana Vista"}
+                              </h4>
+
+                              <p className="text-[11px] md:text-xs text-slate-600 flex items-center gap-1.5">
+                                <span className="text-[#C5A059]">📍</span>
+                                <span className="font-medium truncate">{item.address || item.properti?.alamat || "Lokasi Kost Kafana Vista"}</span>
+                              </p>
+                              
+                              {/* INFORMASI DATES & DURATION */}
+                              <div className="flex flex-wrap items-center gap-2 pt-1">
+                                <div className="bg-white/90 px-2.5 py-1 rounded-lg border border-slate-200/90 text-[10px] text-slate-600 flex items-center gap-1 shadow-2xs">
+                                  <span>📅 In:</span>
+                                  <strong className="text-[#261C19] font-bold">{formatDate(item.check_in_date)}</strong>
+                                </div>
+                                <div className="bg-white/90 px-2.5 py-1 rounded-lg border border-slate-200/90 text-[10px] text-slate-600 flex items-center gap-1 shadow-2xs">
+                                  <span>⏳ Sewa:</span>
+                                  <strong className="text-[#C5A059] font-extrabold">{cleanDuration ? `${cleanDuration} Bulan` : '-'}</strong>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* ACTION BUTTONS */}
+                            {/* 🔴 PERUBAHAN DI SINI: flex direction button lebih ringkas dan padding dikecilkan */}
+                            <div className="flex sm:flex-col gap-2 w-full sm:w-36 shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-200/60">
+                              <Link 
+                                to="/FinanceTracker" 
+                                className="flex-1 text-center text-[10px] md:text-xs font-black uppercase tracking-wider bg-[#261C19] hover:bg-[#3D2D29] text-[#FAF5EF] px-3 py-2 rounded-lg transition-all shadow-md active:scale-98 flex items-center justify-center gap-1.5"
+                              >
+                                <span>💳</span> FinanceTracker
+                              </Link>
+                              <Link 
+                                to="/carihunian" 
+                                className="flex-1 text-center text-[10px] md:text-xs font-black uppercase tracking-wider bg-white hover:bg-slate-100 text-[#261C19] border border-slate-300 px-3 py-2 rounded-lg transition-all shadow-2xs active:scale-98 flex items-center justify-center gap-1.5"
+                              >
+                                <span>🔍</span> Unit Lain
+                              </Link>
+                            </div>
                           </div>
-                          <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200/80 text-xs text-slate-600 shadow-2xs">
-                            Durasi: <strong className="text-[#C5A059] font-bold">{rentStatus?.duration_months}</strong>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex sm:flex-col gap-2.5 w-full md:w-44 shrink-0">
-                        <Link 
-                          to="/FinanceTracker" 
-                          className="text-center text-xs font-extrabold uppercase tracking-wider bg-[#261C19] hover:bg-[#3D2D29] text-white px-4 py-3 rounded-xl transition shadow-md block w-full"
-                        >
-                          💳 FinanceTracker
-                        </Link>
-                        <Link 
-                          to="/carihunian" 
-                          className="text-center text-xs font-extrabold uppercase tracking-wider border border-slate-300 hover:bg-slate-100 text-[#261C19] px-4 py-3 rounded-xl transition block w-full"
-                        >
-                          Cari Unit Lain
-                        </Link>
-                      </div>
+                        );
+                      })}
                     </div>
                   ) : (
-                    <div className="p-8 bg-gradient-to-r from-[#FAF6F0] via-white to-[#FAF6F0] rounded-2xl border-2 border-dashed border-[#C5A059]/40 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
-                      <div className="space-y-1.5 max-w-lg">
-                        <span className="text-xs font-extrabold text-[#C5A059] uppercase tracking-widest">Kafana Exclusive</span>
-                        <h4 className="text-base md:text-lg font-black text-[#261C19]">Belum Ada Unit Hunian yang Diaktifkan</h4>
-                        <p className="text-xs md:text-sm text-slate-500 leading-relaxed">
-                          Nikmati pengalaman tinggal di kost eksklusif dengan fasilitas lengkap, keamanan kelas atas, dan kenyamanan layaknya boutique hotel.
-                        </p>
+                    /* STATE JIKA TIDAK ADA SEWA */
+                    <div className="p-5 bg-gradient-to-r from-[#FAF6F0] via-white to-[#FAF6F0] rounded-xl border-2 border-dashed border-[#C5A059]/40 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
+                      <div className="space-y-1 max-w-md">
+                        <span className="text-[10px] font-extrabold text-[#C5A059] uppercase tracking-widest">Kafana Exclusive</span>
+                        <h4 className="text-sm md:text-base font-black text-[#261C19]">Belum Ada Unit Hunian Aktif</h4>
                       </div>
                       <Link 
                         to="/beranda" 
-                        className="text-xs md:text-sm font-extrabold uppercase tracking-wider bg-gradient-to-r from-[#261C19] to-[#3D2D29] hover:opacity-90 text-[#FAF5EF] px-6 py-3.5 rounded-xl transition shadow-xl whitespace-nowrap active:scale-95 shrink-0 border border-[#C5A059]/30"
+                        className="text-[10px] md:text-xs font-extrabold uppercase tracking-wider bg-gradient-to-r from-[#261C19] to-[#3D2D29] hover:opacity-90 text-[#FAF5EF] px-4 py-2.5 rounded-lg transition shadow-xl whitespace-nowrap active:scale-95 shrink-0 border border-[#C5A059]/30"
                       >
-                        ⚡ Jelajahi Katalog Unit
+                        ⚡ Jelajahi Katalog
                       </Link>
                     </div>
                   )}
+
                 </div>
 
                 {/* FORM DATA DIRI & KEAMANAN */}
@@ -620,20 +642,6 @@ export default function UserProfile() {
 
             </div>
           )}
-
-          {/* FOOTER */}
-          <footer className="pt-6 pb-2 border-t border-[#E5D7C5]/60 text-center text-xs text-slate-500 font-medium flex flex-col sm:flex-row items-center justify-between gap-2">
-            <div>
-              © 2026 <span className="font-bold text-[#261C19]">Kafana Vista Residence</span>. All rights reserved.
-            </div>
-            <div className="flex items-center gap-4 text-slate-400 text-[11px]">
-              <span>Privacy Policy</span>
-              <span>•</span>
-              <span>Terms of Service</span>
-              <span>•</span>
-              <span>Security</span>
-            </div>
-          </footer>
 
         </div>
       </div>

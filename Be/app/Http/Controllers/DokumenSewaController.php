@@ -5,23 +5,35 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\DokumenSewa;
 use App\Models\Pemesanan;
+use App\Models\Properti;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 class DokumenSewaController extends Controller
 {
     /**
-     * 1. ADMIN: Mengambil Semua Daftar Dokumen Sewa Penyewa Aktif
+     * 🔒 1. ADMIN: Mengambil Daftar Dokumen Sewa Khusus Properti Milik Admin Login
      * Endpoint: GET /api/admin/dokumen-sewa
      */
     public function indexAdmin()
     {
-        // Cari semua pemesanan yang statusnya Dikonfirmasi
+        $user = Auth::guard('sanctum')->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        // Lock keras: Ambil HANYA ID Properti yang dimiliki user ini (misal: Dodo)
+        $myPropertyIds = Properti::where('pemilik_id', $user->id)->pluck('id');
+
+        // Cari pemesanan Dikonfirmasi KHUSUS properti milik user ini
         $pemesanans = Pemesanan::with(['customer', 'properti', 'dokumenSewa'])
+            ->whereIn('properti_id', $myPropertyIds)
             ->where('status', 'Dikonfirmasi')
             ->orderBy('id', 'desc')
             ->get();
 
-        // Otomatis terbitkan DokumenSewa jika ada pemesanan dikonfirmasi yang belum punya dokumen
+        // Otomatis terbitkan DokumenSewa jika belum ada
         foreach ($pemesanans as $p) {
             if (!$p->dokumenSewa) {
                 $startDate = Carbon::parse($p->check_in_date);
@@ -50,8 +62,11 @@ class DokumenSewaController extends Controller
             }
         }
 
-        // Ambil data dokumen sewa beserta relasi penyewa & properti
-        $dokumens = DokumenSewa::with(['pemesanan.customer', 'pemesanan.properti', 'pemesanan.kamar'])
+        // Ambil daftar dokumen sewa KHUSUS properti milik admin login
+        $dokumens = DokumenSewa::whereHas('pemesanan', function ($query) use ($myPropertyIds) {
+                $query->whereIn('properti_id', $myPropertyIds);
+            })
+            ->with(['pemesanan.customer', 'pemesanan.properti', 'pemesanan.kamar'])
             ->orderBy('id', 'desc')
             ->get();
 
@@ -62,15 +77,32 @@ class DokumenSewaController extends Controller
     }
 
     /**
-     * 2. SYSTEM/ADMIN: Generate Draf Dokumen Sewa
+     * 🔒 2. GENERATE DRAF DOKUMEN SEWA
      */
     public function generateDokumen(Request $request)
     {
+        $user = Auth::guard('sanctum')->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
         $request->validate([
             'pemesanan_id' => 'required|exists:pemesanans,id'
         ]);
 
-        $pemesanan = Pemesanan::with(['properti', 'customer'])->findOrFail($request->pemesanan_id);
+        $pemesanan = Pemesanan::with(['properti', 'customer'])->find($request->pemesanan_id);
+
+        if (!$pemesanan) {
+            return response()->json(['message' => 'Data pemesanan tidak ditemukan'], 404);
+        }
+
+        // Cek kepemilikan properti
+        if ($pemesanan->properti && (int)$pemesanan->properti->pemilik_id !== (int)$user->id) {
+            return response()->json([
+                'message' => 'Forbidden. Anda tidak memiliki akses ke dokumen properti ini!'
+            ], 403);
+        }
 
         if ($pemesanan->status !== 'Dikonfirmasi') {
             return response()->json([
@@ -94,54 +126,94 @@ class DokumenSewaController extends Controller
         $dokumen = DokumenSewa::updateOrCreate(
             ['pemesanan_id' => $pemesanan->id],
             [
-                'start_date' => $startDate->toDateString(),
-                'end_date' => $endDate->toDateString(),
+                'start_date'      => $startDate->toDateString(),
+                'end_date'        => $endDate->toDateString(),
                 'lease_agreement' => $agreementText,
             ]
         );
 
         return response()->json([
             'message' => 'Draf surat dokumen sewa berhasil digenerate!',
-            'data' => $dokumen
+            'data'    => $dokumen
         ], 201);
     }
 
     /**
-     * 3. CUSTOMER / ADMIN: Upload Tanda Tangan Digital
+     * 🔒 3. UPLOAD TANDA TANGAN DIGITAL
      */
     public function uploadTandaTangan(Request $request, $id)
     {
-        $request->validate([
-            'signature' => 'required|image|mimes:png,jpg,jpeg|max:1024',
-            'role' => 'required|in:customer,admin'
-        ]);
+        $user = Auth::guard('sanctum')->user();
 
-        $dokumen = DokumenSewa::findOrFail($id);
-        $path = $request->file('signature')->store('signatures', 'public');
-
-        if ($request->role === 'customer') {
-            $dokumen->customer_signature = $path;
-        } else {
-            $dokumen->admin_signature = $path;
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        $dokumen->save();
+        $request->validate([
+            'signature' => 'required|image|mimes:png,jpg,jpeg|max:1024',
+        ]);
+
+        $dokumen = DokumenSewa::with(['pemesanan.properti'])->find($id);
+
+        if (!$dokumen) {
+            return response()->json(['message' => 'Dokumen sewa tidak ditemukan'], 404);
+        }
+
+        $path = $request->file('signature')->store('signatures', 'public');
+        $role = strtolower(trim($user->role ?? ''));
+
+        // Jika user adalah Customer penyewa
+        if ($dokumen->pemesanan && (int)$dokumen->pemesanan->customer_id === (int)$user->id) {
+            $dokumen->customer_signature = $path;
+            $dokumen->save();
+
+            return response()->json([
+                'message' => 'Tanda tangan penyewa berhasil diunggah!',
+                'data'    => $dokumen
+            ], 200);
+        }
+
+        // Jika user adalah Admin/Owner pengelola
+        if (in_array($role, ['admin', 'owner', 'pengelola', 'administrator']) || 
+           ($dokumen->pemesanan && $dokumen->pemesanan->properti && (int)$dokumen->pemesanan->properti->pemilik_id === (int)$user->id)) {
+            
+            $dokumen->admin_signature = $path;
+            $dokumen->save();
+
+            return response()->json([
+                'message' => 'Tanda tangan pengelola berhasil diunggah!',
+                'data'    => $dokumen
+            ], 200);
+        }
 
         return response()->json([
-            'message' => 'Tanda tangan ' . $request->role . ' berhasil diunggah!',
-            'data' => $dokumen
-        ], 200);
+            'message' => 'Forbidden. Anda tidak memiliki akses untuk menandatangani dokumen ini!'
+        ], 403);
     }
 
     /**
-     * 4. PUBLIC/USER: Lihat Detail Dokumen Sewa
+     * 🔒 4. LIHAT DETAIL DOKUMEN SEWA
+     * Endpoint: GET /api/dokumen-sewa/{id}
      */
-    public function show($id)
+       public function show($id)
     {
-        $dokumen = DokumenSewa::with(['pemesanan.customer', 'pemesanan.properti'])
+        $user = Auth::guard('sanctum')->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        // 1. PRIORITAS UTAMA: Cari berdasarkan ID Dokumen Sewa (Primary Key)
+        $dokumen = DokumenSewa::with(['pemesanan.customer', 'pemesanan.properti', 'pemesanan.kamar'])
             ->where('id', $id)
-            ->orWhere('pemesanan_id', $id)
             ->first();
+
+        // 2. FALLBACK: Jika tidak ketemu, baru cari berdasarkan pemesanan_id
+        if (!$dokumen) {
+            $dokumen = DokumenSewa::with(['pemesanan.customer', 'pemesanan.properti', 'pemesanan.kamar'])
+                ->where('pemesanan_id', $id)
+                ->first();
+        }
 
         if (!$dokumen) {
             return response()->json([
@@ -149,9 +221,45 @@ class DokumenSewaController extends Controller
             ], 404);
         }
 
+        $role = strtolower(trim($user->role ?? ''));
+        $isAdminRole = in_array($role, ['admin', 'owner', 'pengelola', 'administrator', 'superadmin', 'super_admin']);
+
+        $isCustomer = $dokumen->pemesanan && ((int)$dokumen->pemesanan->customer_id === (int)$user->id);
+        $isPemilik  = $dokumen->pemesanan && $dokumen->pemesanan->properti && ((int)$dokumen->pemesanan->properti->pemilik_id === (int)$user->id);
+
+        if (!$isCustomer && !$isPemilik && !$isAdminRole) {
+            return response()->json([
+                'message' => 'Forbidden. Anda tidak memiliki hak akses untuk melihat dokumen sewa ini.'
+            ], 403);
+        }
+
         return response()->json([
             'message' => 'Berhasil mengambil dokumen sewa',
             'data'    => $dokumen
+        ], 200);
+    }
+        /**
+         * 🔒 5. USER: Mengambil Semua Daftar Dokumen Sewa Penyewa
+         */
+        public function indexUser()
+        {
+            $user = Auth::guard('sanctum')->user();
+
+            if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        $dokumens = DokumenSewa::whereHas('pemesanan', function ($query) use ($user) {
+                $query->where('customer_id', $user->id)
+                      ->where('status', 'Dikonfirmasi');
+            })
+            ->with(['pemesanan.customer', 'pemesanan.properti', 'pemesanan.kamar'])
+            ->orderBy('id', 'desc')
+            ->get();
+
+        return response()->json([
+            'message' => 'Berhasil mengambil daftar dokumen sewa penyewa',
+            'data'    => $dokumens
         ], 200);
     }
 }

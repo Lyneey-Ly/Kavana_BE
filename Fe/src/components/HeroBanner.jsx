@@ -30,7 +30,7 @@ const bannerData = [
   }
 ];
 
-export default function HeroBanner({ autoSlideInterval = 5000 }) {
+export default function HeroBanner({ autoSlideInterval = 1000 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
 

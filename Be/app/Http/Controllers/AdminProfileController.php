@@ -1,25 +1,41 @@
 <?php
 
-namespace App\Http\Controllers; // 👈 Pastikan TANPA \Admin
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
-use App\Models\Properti; // 👈 Model Properti yang ada di folder Models kamu
+use App\Models\Properti;
 
 class AdminProfileController extends Controller
 {
     /**
-     * Get Data Profil Admin & Daftar Kamar
+     * Get Data Profil Admin & Daftar Properti Miliknya
      */
     public function show(Request $request)
     {
         try {
             $admin = $request->user();
 
-            // Mengambil daftar properti
-            $rooms = Properti::latest()->get(); 
+            if (!$admin) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'User/Admin tidak ditemukan atau belum login.'
+                ], 401);
+            }
+
+            // 🔒 CEK ROLE: Jika BUKAN Superadmin, HANYA ambil properti milik admin ini
+            $role = strtolower($admin->role ?? '');
+            $isSuperAdmin = in_array($role, ['superadmin', 'super_admin']);
+
+            $query = Properti::query();
+
+            if (!$isSuperAdmin) {
+                $query->where('pemilik_id', $admin->id);
+            }
+
+            $rooms = $query->latest()->get(); 
 
             return response()->json([
                 'status'  => 'success',
@@ -51,17 +67,23 @@ class AdminProfileController extends Controller
                 ], 401);
             }
 
-            // Validasi Input
+            // 💡 Menggunakan 'sometimes' agar jika hanya ganti foto/phone, name & email tidak wajib dikirim ulang
             $request->validate([
-                'name'     => 'required|string|max:255',
-                'email'    => 'required|email|unique:users,email,' . $admin->id,
+                'name'     => 'sometimes|required|string|max:255',
+                'email'    => 'sometimes|required|email|unique:users,email,' . $admin->id,
                 'phone'    => 'nullable|string|max:20',
                 'password' => 'nullable|string|min:8',
-                'foto'     => 'nullable|image|mimes:jpeg,png,jpg|max:2048'
+                'foto'     => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048'
             ]);
 
-            $admin->name  = $request->name;
-            $admin->email = $request->email;
+            if ($request->has('name')) {
+                $admin->name = $request->name;
+            }
+
+            if ($request->has('email')) {
+                $admin->email = $request->email;
+            }
+
             if ($request->has('phone')) {
                 $admin->phone = $request->phone;
             }

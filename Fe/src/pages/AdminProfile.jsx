@@ -296,7 +296,7 @@ export default function AdminProfile() {
                     <div className="grid grid-cols-2 gap-3 text-left bg-black/30 p-4 rounded-2xl border border-white/5 mb-6">
                       <div className="space-y-1">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Total Unit</span>
-                        <span className="text-xs md:text-sm font-bold text-[#C5A059] block truncate">{rooms.length} Kamar</span>
+                        <span className="text-xs md:text-sm font-bold text-[#C5A059] block truncate">{rooms.length} properti</span>
                       </div>
                       <div className="space-y-1 border-l border-white/10 pl-3">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">WhatsApp Admin</span>

@@ -12,12 +12,14 @@ class DokumenSewa extends Model
     protected $table = 'dokumen_sewas';
 
     protected $fillable = [
-        'pemesanan_id',
-        'start_date',
-        'end_date',
-        'lease_agreement',
-        'customer_signature',
-        'admin_signature',
+    'pemesanan_id',
+    'start_date',
+    'end_date',
+    'lease_agreement',
+    'customer_signature',
+    'admin_signature',
+    'status',
+    'signed_at',
     ];
 
     // Relasi balik ke Pemesanan

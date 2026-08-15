@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import API from '../api';
 import SidebarUser from '../components/SidebarUser';
 import InteractiveMap from '../components/InteractiveMap';
+import Footer from '../components/footer';
+
 
 // HELPER FORMAT HARGA ANTI-CRASH
 const formatPrice = (val) => {
@@ -52,7 +54,9 @@ export default function CariHunian() {
   const [selectedFacilities, setSelectedFacilities] = useState([]);
   const [selectedPeriod, setSelectedPeriod] = useState('Semua');
   const [sortBy, setSortBy] = useState('Rekomendasi Utama');
-  const [showMap, setShowMap] = useState(true);
+  
+  // MAP STATE - Default disembunyikan agar tampilan awal fokus ke foto properti
+  const [showMap, setShowMap] = useState(false); 
   const [mapSelectedProperty, setMapSelectedProperty] = useState(null);
 
   // Modal Detail Properti
@@ -247,7 +251,7 @@ export default function CariHunian() {
 
   const handleMapPropertyClick = (property) => {
     setMapSelectedProperty(property);
-    setSelectedRoom(property);
+    setSelectedRoom(property); // Langsung buka detail saat pin diklik
   };
 
   // FILTER & SORTING LOGIC
@@ -307,7 +311,6 @@ export default function CariHunian() {
     e.target.src = 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=600&q=80';
   };
 
-  // Cek apakah ada filter aktif untuk Chips Bar
   const hasActiveFilters = searchQuery || quickCategory !== 'Semua Properti' || selectedKota !== 'Semua' || selectedAreas.length > 0 || selectedGender.length > 0 || selectedFacilities.length > 0;
 
   return (
@@ -318,28 +321,28 @@ export default function CariHunian() {
         <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#C5A059]/10 rounded-full blur-3xl pointer-events-none"></div>
 
         {/* ========================================================================= */}
-        {/* 🌟 LUXURY FLOATING SEARCH CONSOLE HEADER */}
+        {/* 🌟 LUXURY SEARCH CONSOLE HEADER (STATIC) */}
         {/* ========================================================================= */}
-        <div className="bg-[#FAF6F0]/95 backdrop-blur-xl border-b border-[#E5D7C5] sticky top-0 z-40 py-5 px-4 md:px-8 shadow-xs transition-all">
+        <div className="bg-[#FAF6F0] border-b border-[#E5D7C5] py-5 px-4 md:px-8 shadow-xs transition-all">
           <div className="max-w-7xl mx-auto space-y-3">
             
             {/* MAIN SEARCH ROW */}
             <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
               
-              {/* SEARCH INPUT BAR WITH GOLD GLOW */}
+              {/* SEARCH INPUT BAR */}
               <div className="relative w-full md:flex-1 bg-white border border-[#E5D7C5] hover:border-[#C5A059] focus-within:border-[#C5A059] focus-within:ring-2 focus-within:ring-[#C5A059]/30 rounded-2xl shadow-sm transition-all duration-300 flex items-center px-4 py-2.5">
                 <span className="text-[#C5A059] text-base mr-3 flex-shrink-0 animate-pulse">📍</span>
                 <input 
                   type="text" 
-                  placeholder="Cari lokasi, nama kost, atau daerah (misal: Bojongsoang, Sukabumi)..."
+                  placeholder="Cari lokasi, nama kost, atau daerah..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-transparent focus:outline-none text-xs font-semibold text-[#261C19] placeholder-slate-400"
+                  className="w-full bg-transparent focus:outline-none text-sm font-medium text-[#261C19] placeholder-slate-400"
                 />
                 {searchQuery && (
                   <button 
                     onClick={() => setSearchQuery('')}
-                    className="w-6 h-6 rounded-full bg-slate-100 hover:bg-[#261C19] text-slate-400 hover:text-white text-xs font-bold transition flex items-center justify-center cursor-pointer ml-2 flex-shrink-0"
+                    className="w-6 h-6 rounded-full bg-slate-100 hover:bg-rose-500 text-slate-400 hover:text-white text-xs font-bold transition flex items-center justify-center cursor-pointer ml-2 flex-shrink-0"
                   >
                     ✕
                   </button>
@@ -347,8 +350,8 @@ export default function CariHunian() {
               </div>
 
               {/* QUICK CATEGORY PILLS */}
-              <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end overflow-x-auto no-scrollbar">
-                <div className="bg-white border border-[#E5D7C5] p-1 rounded-2xl flex items-center gap-1 shadow-xs flex-shrink-0">
+              <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-end overflow-x-auto no-scrollbar pb-1 md:pb-0">
+                <div className="bg-white border border-[#E5D7C5] p-1.5 rounded-2xl flex items-center gap-1 shadow-xs flex-shrink-0">
                   {['Semua Properti', 'Kost', 'Kontrakan'].map((cat) => (
                     <button
                       key={cat}
@@ -356,7 +359,7 @@ export default function CariHunian() {
                       className={`px-4 py-2 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all duration-300 cursor-pointer whitespace-nowrap ${
                         quickCategory === cat
                           ? 'bg-[#261C19] text-[#FAF5EF] shadow-md'
-                          : 'text-slate-600 hover:bg-[#FAF6F0] hover:text-[#261C19]'
+                          : 'text-slate-500 hover:bg-[#FAF6F0] hover:text-[#261C19]'
                       }`}
                     >
                       {cat}
@@ -376,9 +379,7 @@ export default function CariHunian() {
             </div>
 
             {/* QUICK CITY SHORTCUTS & ACTIVE FILTER CHIPS BAR */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-[#E5D7C5]/50">
-              
-              {/* Shortcut Kota */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#E5D7C5]/50">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
                 <span className="text-[10px] font-black uppercase tracking-widest text-[#C5A059]">Fokus Kota:</span>
                 {['Semua', 'Bandung', 'Sukabumi'].map((city) => (
@@ -388,10 +389,10 @@ export default function CariHunian() {
                       setSelectedKota(city);
                       setSelectedAreas([]);
                     }}
-                    className={`px-3 py-1 rounded-lg text-[10px] font-extrabold transition cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                       selectedKota === city 
-                        ? 'bg-[#C5A059] text-[#261C19] shadow-xs' 
-                        : 'bg-white/80 hover:bg-white text-slate-600 border border-[#E5D7C5]'
+                        ? 'bg-[#C5A059] text-[#261C19] shadow-sm' 
+                        : 'bg-white hover:bg-slate-50 text-slate-600 border border-[#E5D7C5]'
                     }`}
                   >
                     {city === 'Semua' ? '🌐 Semua Kota' : `📍 ${city}`}
@@ -399,29 +400,27 @@ export default function CariHunian() {
                 ))}
               </div>
 
-              {/* Active Filter Chips & Reset */}
               {hasActiveFilters && (
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[10px] font-bold text-slate-400">Filter Aktif:</span>
                   {selectedAreas.map(area => (
-                    <span key={area} className="bg-[#261C19] text-[#C5A059] text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                      {area} <button onClick={() => handleAreaToggle(area)} className="cursor-pointer hover:text-white">✕</button>
+                    <span key={area} className="bg-[#261C19] text-[#C5A059] text-[10px] font-bold px-3 py-1 rounded-full flex items-center gap-1.5 shadow-sm">
+                      {area} <button onClick={() => handleAreaToggle(area)} className="cursor-pointer hover:text-white transition-colors">✕</button>
                     </span>
                   ))}
                   {selectedGender.map(gen => (
-                    <span key={gen} className="bg-[#261C19] text-[#C5A059] text-[10px] font-bold px-2.5 py-0.5 rounded-full capitalize flex items-center gap-1">
-                      {gen} <button onClick={() => handleGenderToggle(gen)} className="cursor-pointer hover:text-white">✕</button>
+                    <span key={gen} className="bg-[#261C19] text-[#C5A059] text-[10px] font-bold px-3 py-1 rounded-full capitalize flex items-center gap-1.5 shadow-sm">
+                      {gen} <button onClick={() => handleGenderToggle(gen)} className="cursor-pointer hover:text-white transition-colors">✕</button>
                     </span>
                   ))}
                   <button 
                     onClick={handleResetFilters}
-                    className="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer ml-1"
+                    className="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer ml-1 transition-colors"
                   >
                     Reset Filter ↺
                   </button>
                 </div>
               )}
-
             </div>
 
           </div>
@@ -433,28 +432,22 @@ export default function CariHunian() {
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
-            {/* SIDEBAR FILTER */}
-            <div className={`lg:block lg:col-span-3 space-y-6 bg-white border border-[#E5D7C5] rounded-3xl p-6 sticky top-36 h-fit shadow-xs transition-all duration-300 ${
+            {/* SIDEBAR FILTER (3 Kolom) - DIPERBAIKI DENGAN SCROLL & MAX-HEIGHT */}
+            <div className={`lg:block lg:col-span-3 bg-white border border-[#E5D7C5] rounded-3xl p-5 sticky top-24 h-fit max-h-[85vh] overflow-y-auto no-scrollbar shadow-xs transition-all duration-300 ${
               showFilterMobile ? 'block mb-6' : 'hidden'
             }`}>
               
-              <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-5">
                 <h3 className="font-extrabold text-[#261C19] text-base tracking-wide flex items-center gap-2">
                   <span>⚙️</span> Filter Detail
                 </h3>
-                <button 
-                  onClick={handleResetFilters} 
-                  className="text-[10px] text-[#C5A059] uppercase tracking-widest font-extrabold hover:text-[#261C19] transition-colors cursor-pointer"
-                >
-                  Reset
-                </button>
               </div>
 
               {/* KOTA & AREA DAERAH */}
-              <div className="space-y-3">
+              <div className="space-y-4 mb-6">
                 <label className="block text-[10px] uppercase tracking-widest font-black text-[#C5A059]">Area &amp; Wilayah</label>
                 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {/* Kota Bandung */}
                   <div className="space-y-2">
                     <button 
@@ -462,8 +455,8 @@ export default function CariHunian() {
                         setSelectedKota(selectedKota === 'Bandung' ? 'Semua' : 'Bandung');
                         setSelectedAreas([]);
                       }}
-                      className={`w-full flex justify-between items-center px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-                        selectedKota === 'Bandung' ? 'bg-[#261C19] text-white shadow-sm' : 'bg-[#FAF6F0] text-[#261C19] hover:bg-[#E5D7C5]/40'
+                      className={`w-full flex justify-between items-center px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer border ${
+                        selectedKota === 'Bandung' ? 'bg-[#261C19] text-white border-[#261C19] shadow-sm' : 'bg-white text-[#261C19] border-[#E5D7C5] hover:bg-[#FAF6F0]'
                       }`}
                     >
                       <span>📍 Kota Bandung</span>
@@ -471,14 +464,14 @@ export default function CariHunian() {
                     </button>
 
                     {selectedKota === 'Bandung' && (
-                      <div className="pl-4 space-y-1.5 border-l-2 border-[#C5A059] my-2 text-xs font-medium text-[#261C19]">
+                      <div className="pl-4 space-y-2 border-l-2 border-[#C5A059] my-2 text-sm font-medium text-[#261C19]">
                         {areaKota.Bandung.map((area, idx) => (
-                          <label key={idx} className="flex items-center gap-2 cursor-pointer group py-1">
+                          <label key={idx} className="flex items-center gap-3 cursor-pointer group py-1">
                             <input 
                               type="checkbox" 
                               checked={selectedAreas.includes(area)}
                               onChange={() => handleAreaToggle(area)}
-                              className="w-3.5 h-3.5 accent-[#C5A059] cursor-pointer" 
+                              className="w-4 h-4 accent-[#C5A059] cursor-pointer rounded" 
                             />
                             <span className="group-hover:text-[#C5A059] transition-colors">{area}</span>
                           </label>
@@ -494,8 +487,8 @@ export default function CariHunian() {
                         setSelectedKota(selectedKota === 'Sukabumi' ? 'Semua' : 'Sukabumi');
                         setSelectedAreas([]);
                       }}
-                      className={`w-full flex justify-between items-center px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-                        selectedKota === 'Sukabumi' ? 'bg-[#261C19] text-white shadow-sm' : 'bg-[#FAF6F0] text-[#261C19] hover:bg-[#E5D7C5]/40'
+                      className={`w-full flex justify-between items-center px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer border ${
+                        selectedKota === 'Sukabumi' ? 'bg-[#261C19] text-white border-[#261C19] shadow-sm' : 'bg-white text-[#261C19] border-[#E5D7C5] hover:bg-[#FAF6F0]'
                       }`}
                     >
                       <span>📍 Kota Sukabumi</span>
@@ -503,14 +496,14 @@ export default function CariHunian() {
                     </button>
 
                     {selectedKota === 'Sukabumi' && (
-                      <div className="pl-4 space-y-1.5 border-l-2 border-[#C5A059] my-2 text-xs font-medium text-[#261C19]">
+                      <div className="pl-4 space-y-2 border-l-2 border-[#C5A059] my-2 text-sm font-medium text-[#261C19]">
                         {areaKota.Sukabumi.map((area, idx) => (
-                          <label key={idx} className="flex items-center gap-2 cursor-pointer group py-1">
+                          <label key={idx} className="flex items-center gap-3 cursor-pointer group py-1">
                             <input 
                               type="checkbox" 
                               checked={selectedAreas.includes(area)}
                               onChange={() => handleAreaToggle(area)}
-                              className="w-3.5 h-3.5 accent-[#C5A059] cursor-pointer" 
+                              className="w-4 h-4 accent-[#C5A059] cursor-pointer rounded" 
                             />
                             <span className="group-hover:text-[#C5A059] transition-colors">{area}</span>
                           </label>
@@ -522,16 +515,16 @@ export default function CariHunian() {
               </div>
 
               {/* Tipe Penghuni */}
-              <div className="space-y-3 pt-3 border-t border-slate-100">
+              <div className="space-y-4 pt-4 border-t border-slate-100 mb-6">
                 <label className="block text-[10px] uppercase tracking-widest font-black text-[#C5A059]">Tipe Penghuni</label>
-                <div className="space-y-2 text-xs font-medium text-[#261C19]">
+                <div className="space-y-3 text-sm font-medium text-[#261C19]">
                   {['male', 'female', 'mixed'].map((g) => (
                     <label key={g} className="flex items-center gap-3 cursor-pointer group">
                       <input 
                         type="checkbox" 
                         checked={selectedGender.includes(g)}
                         onChange={() => handleGenderToggle(g)}
-                        className="w-4 h-4 accent-[#C5A059] cursor-pointer" 
+                        className="w-4 h-4 accent-[#C5A059] cursor-pointer rounded" 
                       /> 
                       <span className="group-hover:text-[#C5A059] transition-colors capitalize">Kost {g}</span>
                     </label>
@@ -540,16 +533,16 @@ export default function CariHunian() {
               </div>
 
               {/* Filter Fasilitas */}
-              <div className="space-y-3 pt-3 border-t border-slate-100">
+              <div className="space-y-4 pt-4 border-t border-slate-100 mb-6">
                 <label className="block text-[10px] uppercase tracking-widest font-black text-[#C5A059]">Fasilitas Utama</label>
-                <div className="space-y-2 text-xs font-medium text-[#261C19]">
+                <div className="space-y-3 text-sm font-medium text-[#261C19]">
                   {['Wifi', 'AC', 'KM Dalam', 'Parkir Mobil', 'Gayung Pribadi'].map((fac) => (
                     <label key={fac} className="flex items-center gap-3 cursor-pointer group">
                       <input 
                         type="checkbox" 
                         checked={selectedFacilities.includes(fac)}
                         onChange={() => handleFacilityToggle(fac)}
-                        className="w-4 h-4 accent-[#C5A059] cursor-pointer" 
+                        className="w-4 h-4 accent-[#C5A059] cursor-pointer rounded" 
                       /> 
                       <span className="group-hover:text-[#C5A059] transition-colors">{fac}</span>
                     </label>
@@ -558,9 +551,9 @@ export default function CariHunian() {
               </div>
 
               {/* Sistem Sewa */}
-              <div className="space-y-3 pt-3 border-t border-slate-100">
+              <div className="space-y-4 pt-4 border-t border-slate-100">
                 <label className="block text-[10px] uppercase tracking-widest font-black text-[#C5A059]">Sistem Sewa</label>
-                <div className="space-y-2 text-xs font-medium text-[#261C19]">
+                <div className="space-y-3 text-sm font-medium text-[#261C19]">
                   {[
                     { label: 'Semua Periode', val: 'Semua' },
                     { label: 'Per Bulan', val: 'bulan' },
@@ -582,73 +575,76 @@ export default function CariHunian() {
 
             </div>
 
-            {/* CATALOG / LISTING HUNIAN */}
-            <div className="lg:col-span-9 space-y-6">
+            {/* CATALOG / LISTING HUNIAN (9 Kolom) */}
+            <div className="lg:col-span-9 flex flex-col space-y-6">
               
               {/* Map Toggle & Controls Header */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white border border-[#E5D7C5] rounded-3xl p-5 shadow-xs">
-                <p className="text-xs text-slate-600 font-medium">
-                  Menampilkan <span className="text-[#C5A059] font-extrabold">{filteredProperties.length} Unit Properti</span> Pilihan
-                </p>
+                <div>
+                  <h2 className="text-lg font-black text-[#261C19]">Temukan Hunian Impianmu</h2>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Menampilkan <span className="text-[#C5A059] font-extrabold">{filteredProperties.length} Properti</span>
+                  </p>
+                </div>
                 
-                <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                  <button
-                    onClick={() => setShowMap(!showMap)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-extrabold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
-                      showMap 
-                        ? 'bg-[#261C19] text-white shadow-md' 
-                        : 'bg-white text-slate-700 border border-[#E5D7C5] hover:bg-[#FAF6F0]'
-                    }`}
-                  >
-                    <span>🗺️ {showMap ? 'Sembunyikan Peta' : 'Buka Peta'}</span>
-                  </button>
-
-                  <div className="flex items-center gap-2">
-                    <label className="text-[10px] text-slate-400 font-black uppercase tracking-wider hidden md:inline">Urutkan:</label>
+                <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                  <div className="flex items-center gap-2 w-full sm:w-auto bg-[#FAF6F0] p-1.5 rounded-xl border border-[#E5D7C5]">
+                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-wider px-2">Urutkan:</label>
                     <select 
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value)}
-                      className="border-0 bg-transparent text-xs font-extrabold text-[#261C19] focus:outline-none cursor-pointer hover:text-[#C5A059] transition-colors"
+                      className="border-0 bg-transparent text-sm font-extrabold text-[#261C19] focus:outline-none cursor-pointer hover:text-[#C5A059] transition-colors py-1"
                     >
-                      <option value="Rekomendasi Utama">Rekomendasi Utama</option>
-                      <option value="Harga: Rendah ke Tinggi">Harga: Rendah ke Tinggi</option>
-                      <option value="Harga: Tinggi ke Rendah">Harga: Tinggi ke Rendah</option>
-                      <option value="Ulasan Tertinggi">Rating Tertinggi</option>
+                      <option value="Rekomendasi Utama">Rekomendasi</option>
+                      <option value="Harga: Rendah ke Tinggi">Termurah</option>
+                      <option value="Harga: Tinggi ke Rendah">Termahal</option>
+                      <option value="Ulasan Tertinggi">Rating</option>
                     </select>
                   </div>
+
+                  <button
+                    onClick={() => setShowMap(!showMap)}
+                    className={`flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+                      showMap 
+                        ? 'bg-[#261C19] text-white shadow-md' 
+                        : 'bg-white text-slate-700 border border-[#E5D7C5] hover:bg-[#FAF6F0] hover:text-[#261C19]'
+                    }`}
+                  >
+                    <span>{showMap ? '🗺️ Tutup Peta' : '🗺️ Lihat Peta'}</span>
+                  </button>
                 </div>
               </div>
 
-              {/* Map + Listings Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {showMap && (
-                  <div className="lg:col-span-5 xl:col-span-4 h-[500px] lg:h-[600px] sticky top-36">
-                    <InteractiveMap
+              {/* 🗺️ MAP DIUBAH MENJADI BANNER FULL WIDTH DI ATAS KARTU */}
+              {showMap && (
+                <div className="w-full h-[400px] bg-white border border-[#E5D7C5] rounded-3xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500 z-0 relative">
+                   <InteractiveMap
                       properties={filteredProperties}
                       selectedProperty={mapSelectedProperty}
                       onPropertyClick={handleMapPropertyClick}
                       center={{ lat: -6.9175, lng: 107.6191 }}
                       zoom={12}
                       height="100%"
-                      showCluster={false}
+                      showCluster={true}
                     />
+                </div>
+              )}
+              
+              {/* Cards Grid Listing - DIUBAH MENJADI 4 BARIS (4 KOLOM) DI LAYAR BESAR */}
+              <div className="w-full">
+                {loading ? (
+                  <div className="p-20 text-center bg-white rounded-3xl border border-[#E5D7C5] space-y-4">
+                    <div className="w-14 h-14 border-4 border-[#C5A059] border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Mencari Hunian Terbaik...</p>
                   </div>
-                )}
-                
-                {/* Cards Grid Listing */}
-                <div className={`${showMap ? 'lg:col-span-7 xl:col-span-8' : 'lg:col-span-12'} space-y-6`}>
-                  {loading ? (
-                    <div className="p-16 text-center bg-white rounded-3xl border border-[#E5D7C5] space-y-3">
-                      <div className="w-12 h-12 border-4 border-[#C5A059] border-t-transparent rounded-full animate-spin mx-auto"></div>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Mencari Hunian Terpopuler...</p>
-                    </div>
-                  ) : filteredProperties.length > 0 ? (
-                    filteredProperties.map((item) => (
+                ) : filteredProperties.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                    {filteredProperties.map((item) => (
                       <div 
                         key={item.id} 
-                        className="bg-white border border-[#E5D7C5] rounded-3xl shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group overflow-hidden"
+                        className="bg-white border border-[#E5D7C5] rounded-3xl shadow-sm hover:shadow-xl hover:border-[#C5A059]/50 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group overflow-hidden"
                       >
-                        <div className="relative overflow-hidden aspect-[4/3] bg-slate-100">
+                        <div className="relative overflow-hidden aspect-[4/3] bg-slate-100 cursor-pointer" onClick={() => setSelectedRoom(item)}>
                           <img 
                             src={item.image} 
                             alt={item.title} 
@@ -656,94 +652,111 @@ export default function CariHunian() {
                             onError={handleImageError}
                           />
                           
-                          <span className="absolute top-4 left-4 bg-[#261C19]/90 backdrop-blur-sm text-[#FAF5EF] text-[9px] tracking-widest font-black uppercase px-3 py-1.5 rounded-full shadow-sm">
-                            {item.type} • {item.gender}
-                          </span>
+                          {/* Label Tipe Properti */}
+                          <div className="absolute top-4 left-4 flex flex-col gap-2">
+                            <span className="bg-[#261C19]/90 backdrop-blur-sm text-[#FAF5EF] text-[10px] tracking-widest font-black uppercase px-3 py-1.5 rounded-full shadow-sm w-fit">
+                              {item.type}
+                            </span>
+                          </div>
 
+                          {/* Ketersediaan */}
                           {!item.isAvailable && (
-                            <div className="absolute inset-0 bg-[#261C19]/70 backdrop-blur-[2px] flex items-center justify-center">
-                              <span className="bg-rose-600 text-white text-[10px] font-black tracking-widest uppercase px-4 py-2 rounded-full shadow-lg">
+                            <div className="absolute inset-0 bg-[#261C19]/70 backdrop-blur-[2px] flex items-center justify-center z-10">
+                              <span className="bg-rose-600 text-white text-xs font-black tracking-widest uppercase px-5 py-2.5 rounded-full shadow-lg border-2 border-white/20">
                                 SUDAH PENUH
                               </span>
                             </div>
                           )}
                         </div>
 
-                        <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center text-xs text-slate-500">
-                              <span className="font-bold text-[#C5A059] line-clamp-1">📍 {item.location}</span>
-                              <span className="font-extrabold text-[#261C19] flex-shrink-0">★ {item.rating} <span className="text-slate-400 font-medium text-[10px]">({item.reviews})</span></span>
+                        <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-bold text-[#C5A059] truncate pr-2">📍 {item.location}</span>
+                              <span className="font-extrabold text-[#261C19] flex-shrink-0 bg-[#FAF6F0] px-2 py-1 rounded-lg">
+                                ★ {item.rating} <span className="text-slate-500 font-medium text-[10px]">({item.reviews})</span>
+                              </span>
                             </div>
 
-                            <h4 className="font-extrabold text-[#261C19] text-base leading-snug group-hover:text-[#C5A059] transition-colors line-clamp-2">
+                            <h4 
+                              onClick={() => setSelectedRoom(item)}
+                              className="font-extrabold text-[#261C19] text-base leading-tight group-hover:text-[#C5A059] transition-colors line-clamp-2 cursor-pointer"
+                            >
                               {item.title}
                             </h4>
 
-                            <div className="flex flex-wrap gap-1.5 pt-1">
-                              {item.tags.slice(0, 3).map((tag, idx) => (
-                                <span key={idx} className="bg-[#FAF6F0] border border-[#E5D7C5]/60 text-slate-600 font-bold text-[10px] px-2.5 py-0.5 rounded-md">
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              {/* Label Gender diubah jadi tag */}
+                              <span className="bg-slate-100 border border-slate-200 text-slate-600 font-bold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-md">
+                                🚻 {item.gender}
+                              </span>
+                              {item.tags.slice(0, 2).map((tag, idx) => (
+                                <span key={idx} className="bg-[#FAF6F0] border border-[#E5D7C5]/60 text-[#C5A059] font-bold text-[10px] px-2.5 py-1 rounded-md">
                                   {tag}
                                 </span>
                               ))}
+                              {item.tags.length > 2 && (
+                                <span className="text-[10px] text-slate-400 font-bold self-center">+{item.tags.length - 2} lagi</span>
+                              )}
                             </div>
                           </div>
 
-                          <div className="border-t border-slate-100 pt-4 flex items-center justify-between mt-auto">
+                          <div className="border-t border-slate-100 pt-4 flex flex-col gap-3 mt-auto">
                             <div>
-                              <p className="text-[9px] uppercase tracking-widest text-slate-400 font-black">Mulai dari</p>
-                              <p className="text-sm font-black text-[#261C19]">{item.price} <span className="text-slate-500 font-normal text-[10px]">/{item.period}</span></p>
+                              <p className="text-[10px] uppercase tracking-widest text-slate-400 font-black mb-1">Mulai dari</p>
+                              <p className="text-lg font-black text-[#261C19]">{item.price} <span className="text-slate-500 font-normal text-[10px]">/{item.period}</span></p>
                             </div>
 
-                            <div className="flex gap-1.5">
+                            <div className="flex gap-2 w-full">
                               <button 
                                 onClick={() => setSelectedRoom(item)}
-                                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-[#261C19] text-xs font-bold rounded-xl transition cursor-pointer"
-                                title="Lihat Detail"
+                                className="flex-1 py-2.5 bg-slate-100 hover:bg-[#E5D7C5]/30 text-[#261C19] text-xs font-bold rounded-xl transition cursor-pointer border border-transparent hover:border-[#E5D7C5]"
                               >
-                                👁️
+                                Detail
                               </button>
 
                               <button 
                                 disabled={!item.isAvailable}
                                 onClick={() => handleBooking(item)}
-                                className={`px-4 py-2.5 rounded-xl text-[10px] tracking-widest font-extrabold uppercase transition-all duration-300 cursor-pointer ${
+                                className={`flex-[2] py-2.5 rounded-xl text-[11px] tracking-widest font-extrabold uppercase transition-all duration-300 cursor-pointer ${
                                   item.isAvailable 
-                                    ? 'bg-[#261C19] text-white hover:bg-[#C5A059] hover:text-[#261C19] shadow-md' 
+                                    ? 'bg-[#261C19] text-white hover:bg-[#C5A059] hover:text-[#261C19] shadow-md hover:shadow-lg' 
                                     : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                 }`}
                               >
-                                Book
+                                Booking
                               </button>
                             </div>
                           </div>
                         </div>
-
                       </div>
-                    ))
-                  ) : (
-                    <div className="bg-white p-12 text-center rounded-3xl border border-dashed border-[#E5D7C5] space-y-3">
-                      <p className="text-sm text-slate-500 font-bold">Tidak ada hunian yang cocok dengan kriteria filter kamu.</p>
-                      <button 
-                        onClick={handleResetFilters}
-                        className="text-xs font-bold text-[#C5A059] uppercase tracking-wider underline hover:text-[#261C19] transition cursor-pointer"
-                      >
-                        Reset Semua Filter
-                      </button>
-                    </div>
-                  )}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white p-16 text-center rounded-3xl border-2 border-dashed border-[#E5D7C5] space-y-4">
+                    <div className="text-4xl">🔍</div>
+                    <p className="text-base text-[#261C19] font-bold">Tidak ada hunian yang cocok dengan kriteria filter kamu.</p>
+                    <p className="text-sm text-slate-500">Coba hapus beberapa filter atau cari di area lain.</p>
+                    <button 
+                      onClick={handleResetFilters}
+                      className="mt-4 px-6 py-2.5 bg-[#FAF6F0] border border-[#C5A059] text-[#C5A059] font-bold rounded-xl hover:bg-[#C5A059] hover:text-white transition cursor-pointer"
+                    >
+                      Reset Semua Filter
+                    </button>
+                  </div>
+                )}
               </div>
-
             </div>
+
           </div>
         </div>
 
-        {/* MODAL DETAIL HUNIAN */}
+        {/* MODAL DETAIL HUNIAN - Ditingkatkan Estetikanya */}
         {selectedRoom && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-[#E5D7C5] animate-in fade-in zoom-in-95 duration-200">
-              <div className="relative h-56 bg-slate-200">
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 md:p-6 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
+              
+              <div className="relative h-64 md:h-72 bg-slate-200 flex-shrink-0">
                 <img 
                   src={selectedRoom.image} 
                   alt={selectedRoom.title} 
@@ -752,40 +765,66 @@ export default function CariHunian() {
                 />
                 <button 
                   onClick={() => setSelectedRoom(null)}
-                  className="absolute top-3 right-3 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center font-bold hover:bg-black transition cursor-pointer"
+                  className="absolute top-4 right-4 w-10 h-10 bg-black/40 backdrop-blur-md text-white rounded-full flex items-center justify-center font-bold hover:bg-rose-600 transition cursor-pointer border border-white/20"
                 >
                   ✕
                 </button>
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6 pt-20">
+                    <div className="flex gap-2 mb-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-[#261C19] bg-[#C5A059] px-3 py-1 rounded-full shadow-sm">
+                            {selectedRoom.type}
+                        </span>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-white bg-white/20 backdrop-blur-md border border-white/30 px-3 py-1 rounded-full">
+                            Penghuni: {selectedRoom.gender}
+                        </span>
+                    </div>
+                </div>
               </div>
 
-              <div className="p-6 space-y-4">
+              <div className="p-6 md:p-8 space-y-6 overflow-y-auto">
                 <div>
-                  <span className="text-[10px] font-black uppercase tracking-wider text-[#C5A059] bg-[#FAF6F0] px-2.5 py-1 rounded-full border border-[#E5D7C5]">
-                    {selectedRoom.type} • {selectedRoom.gender}
-                  </span>
-                  <h3 className="text-xl font-extrabold text-[#261C19] mt-2">{selectedRoom.title}</h3>
-                  <p className="text-xs text-slate-500 font-bold">📍 {selectedRoom.location}</p>
+                  <h3 className="text-2xl font-extrabold text-[#261C19]">{selectedRoom.title}</h3>
+                  <p className="text-sm text-slate-500 font-medium mt-1 flex items-center gap-1">📍 {selectedRoom.location}</p>
                 </div>
 
-                <div className="space-y-1">
-                  <p className="text-[10px] font-black uppercase text-slate-400">Fasilitas Properti:</p>
-                  <div className="flex flex-wrap gap-1.5">
+                <div className="grid grid-cols-2 gap-4 bg-[#FAF6F0] p-4 rounded-2xl border border-[#E5D7C5]/50">
+                    <div>
+                        <p className="text-[10px] uppercase font-bold text-slate-400">Rating Properti</p>
+                        <p className="text-sm font-black text-[#261C19]">⭐ {selectedRoom.rating} <span className="font-normal text-slate-500">({selectedRoom.reviews} ulasan)</span></p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] uppercase font-bold text-slate-400">Status Ketersediaan</p>
+                        <p className={`text-sm font-black ${selectedRoom.isAvailable ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {selectedRoom.isAvailable ? 'Tersedia ✅' : 'Kamar Penuh ❌'}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-black uppercase text-[#C5A059] tracking-wider">Fasilitas Tersedia</p>
+                  <div className="flex flex-wrap gap-2">
                     {selectedRoom.tags.map((tag, idx) => (
-                      <span key={idx} className="bg-[#FAF6F0] border border-[#E5D7C5] text-xs px-2.5 py-1 rounded-lg font-bold text-[#261C19]">
-                        ✓ {tag}
+                      <span key={idx} className="bg-white border border-[#E5D7C5] text-sm px-3 py-1.5 rounded-xl font-bold text-[#261C19] shadow-sm flex items-center gap-1.5">
+                        <span className="text-[#C5A059]">✓</span> {tag}
                       </span>
                     ))}
                   </div>
                 </div>
 
-                <p className="text-xs text-slate-600 leading-relaxed bg-[#FAF6F0] p-3.5 rounded-2xl border border-[#E5D7C5]/60 font-serif italic">
-                  "{selectedRoom.desc}"
-                </p>
+                <div className="space-y-2">
+                   <p className="text-xs font-black uppercase text-[#C5A059] tracking-wider">Deskripsi Properti</p>
+                   <p className="text-sm text-slate-600 leading-relaxed">
+                     {selectedRoom.desc}
+                   </p>
+                </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              </div>
+
+              {/* FOOTER MODAL (STICKY BOTTOM) */}
+              <div className="p-6 border-t border-slate-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-4 flex-shrink-0">
                   <div>
-                    <p className="text-[10px] text-slate-400 uppercase font-black">Harga Sewa</p>
-                    <p className="text-lg font-black text-[#261C19]">{selectedRoom.price} <span className="text-xs font-normal text-slate-500">/{selectedRoom.period}</span></p>
+                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Harga Sewa</p>
+                    <p className="text-2xl font-black text-[#261C19]">{selectedRoom.price} <span className="text-sm font-medium text-slate-500">/{selectedRoom.period}</span></p>
                   </div>
 
                   <button
@@ -795,21 +834,21 @@ export default function CariHunian() {
                       setSelectedRoom(null);
                       handleBooking(roomToBook);
                     }}
-                    className={`px-6 py-3 rounded-2xl text-xs font-extrabold uppercase tracking-widest transition cursor-pointer ${
+                    className={`w-full sm:w-auto px-8 py-3.5 rounded-2xl text-sm font-extrabold uppercase tracking-widest transition-all cursor-pointer ${
                       selectedRoom.isAvailable 
-                        ? 'bg-[#261C19] hover:bg-[#C5A059] text-white hover:text-[#261C19] shadow-lg' 
+                        ? 'bg-[#261C19] hover:bg-[#C5A059] text-white hover:text-[#261C19] shadow-lg hover:shadow-xl hover:-translate-y-1' 
                         : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                     }`}
                   >
-                    {selectedRoom.isAvailable ? 'Lihat Detail Full' : 'Unit Penuh'}
+                    {selectedRoom.isAvailable ? 'Lanjut Booking' : 'Unit Penuh'}
                   </button>
                 </div>
-              </div>
             </div>
           </div>
         )}
 
       </div>
+      <Footer/>
     </SidebarUser>
   );
 }

@@ -24,7 +24,12 @@ import DetailKamar from './pages/detailkamar';
 import AdminProfile from './pages/AdminProfile'; 
 import AdminDokumenSewa from './pages/AdminDokumenSewa';
 import Testimoni from './pages/Testimoni';
+import NotificationBell from './components/NotificationBell';
+import Wishlist from './pages/whislist';
+import Footer from './components/footer';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
+
+
 
 
 // Placeholder untuk halaman lain (biar routing ga error dulu)
@@ -36,10 +41,12 @@ export default function App() {
       <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
         <Routes>
           {/* Main Landing Page */}
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/home" element={<Home />} />
+          
           
           {/* Halaman Home bertema Seaside */}
-          <Route path="/home" element={<Home />} />
+          <Route path="/landingpages" element={<LandingPage />} />
           <Route path="/PusatBantuan" element={<PusatBantuan />} />
           <Route path="/katalogproperti" element={<KatalogProperti />} />
           
@@ -58,6 +65,8 @@ export default function App() {
           <Route path="/roomchat" element={<ChatRoom />} />
           <Route path="/komplain" element={<KomplainUser />} />
           <Route path="/testimoni" element={<Testimoni />} /> 
+          <Route path="/whislist" element={<Wishlist />} /> 
+          <Route path="/footer" element={<Footer />} /> 
           <Route path="/SuperAdminDashboard" element={<SuperAdminDashboard />} /> 
 
           
@@ -74,6 +83,7 @@ export default function App() {
           <Route path="/admin/komplain" element={<AdminKomplain />} />
           <Route path="/admin/dokumen-sewa" element={<AdminDokumenSewa />} />
           <Route path="/admin/dokumen-sewa/:id" element={<AdminDokumenSewa />} />
+          <Route path="/NotificationBell" element={<NotificationBell />} />
 
         </Routes>
       </div>

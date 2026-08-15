@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import SidebarAdmin from '../components/SidebarAdmin';
 import API from '../api';
+import Swal from 'sweetalert2';
 
 export default function AdminTagihanOrder() {
   // 1. STATE DATA UTAMA & LOADING
@@ -40,26 +41,56 @@ export default function AdminTagihanOrder() {
   }, [fetchTagihanOrder]);
 
   // =========================================================================
-  // ⚡ HANDLER VERIFIKASI
+  // ⚡ HANDLER VERIFIKASI DENGAN SWEETALERT2
   // =========================================================================
   const handleKonfirmasiStatus = async (statusTarget) => {
     if (!selectedInvoice) return;
 
+    // Konfirmasi sebelum eksekusi
+    const confirmResult = await Swal.fire({
+      title: 'Konfirmasi Perubahan Status',
+      text: `Apakah Anda yakin ingin mengubah status pemesanan ini menjadi "${statusTarget}"?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: statusTarget === 'Dikonfirmasi' ? '#261C19' : '#e11d48',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Ya, Lanjutkan',
+      cancelButtonText: 'Batal',
+      reverseButtons: true
+    });
+
+    if (!confirmResult.isConfirmed) return;
+
     setSubmitting(true);
     try {
-      const response = await API.post(`/pemesanan/${selectedInvoice.id}/status`, {
+      const response = await API.post(`/admin/pemesanan/${selectedInvoice.id}/status`, {
         status: statusTarget // 'Dikonfirmasi' atau 'Ditolak'
       });
 
-      alert(response.data.message || `✨ Berhasil mengubah status menjadi ${statusTarget}!`);
-      
       setIsModalOpen(false);
       setSelectedInvoice(null);
       fetchTagihanOrder();
 
+      // Notifikasi Sukses
+      Swal.fire({
+        icon: 'success',
+        title: 'Berhasil!',
+        text: response.data.message || `Status pesanan berhasil diubah menjadi ${statusTarget}.`,
+        confirmButtonColor: '#261C19',
+        timer: 2000,
+        timerProgressBar: true
+      });
+
     } catch (err) {
       console.error("Gagal verifikasi booking:", err);
-      alert(err.response?.data?.message || "Gagal memproses verifikasi.");
+      
+      // Notifikasi Error
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Memproses!',
+        text: err.response?.data?.message || "Terjadi kesalahan saat memproses verifikasi status.",
+        confirmButtonColor: '#261C19'
+      });
     } finally {
       setSubmitting(false);
     }

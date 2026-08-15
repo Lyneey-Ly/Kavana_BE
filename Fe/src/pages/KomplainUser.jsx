@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import Swal from 'sweetalert2'; // <--- Import SweetAlert2
+import Swal from 'sweetalert2';
 import API from '../api';
 import SidebarUser from '../components/SidebarUser';
+import Footer from '../components/footer';
 
 export default function KomplainUser() {
   const [complaints, setComplaints] = useState([]);
-  const [activeRental, setActiveRental] = useState(null); // Menyimpan sewa aktif user
+  const [activeRentals, setActiveRentals] = useState([]); // Array untuk menampung banyak sewa aktif
+  const [selectedRentalId, setSelectedRentalId] = useState('');
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -24,6 +26,14 @@ export default function KomplainUser() {
   const [foto, setFoto] = useState(null);
   const [fotoPreview, setFotoPreview] = useState(null);
 
+  const storageBaseUrl = import.meta.env.VITE_STORAGE_BASE_URL || 'http://localhost:8000/storage';
+
+  const getImageUrl = (path) => {
+    if (!path) return '';
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    return `${storageBaseUrl}/${path.replace(/^\//, '')}`;
+  };
+
   // Fetch Daftar Komplain milik User
   const fetchMyComplaints = async () => {
     try {
@@ -37,32 +47,56 @@ export default function KomplainUser() {
     }
   };
 
-  // Fetch Data Sewa Aktif User (Auto-detect properti & kamar)
-  const fetchActiveRental = async () => {
+  // Fetch Semua Data Sewa Aktif User (Bisa > 1)
+  const fetchActiveRentals = async () => {
     try {
-      const res = await API.get('my-active-rental'); 
-      const rental = res.data.data || res.data;
+      const res = await API.get('/my-active-rental');
+      const rawData = res.data.data || res.data;
+      
+      // Pastikan data selalu berupa Array
+      const rentalsList = Array.isArray(rawData) ? rawData : (rawData ? [rawData] : []);
+      setActiveRentals(rentalsList);
 
-      if (rental) {
-        setActiveRental(rental);
-        // Set properti & kamar otomatis
-        setPropertiId(rental.properti_id || rental.properti?.id || '');
-        setKamarId(rental.kamar_id || rental.kamar?.id || '');
+      // Default pilih unit pertama jika ada
+      if (rentalsList.length > 0) {
+        selectRentalUnit(rentalsList[0]);
       }
     } catch (err) {
       console.error('Gagal mengambil data sewa aktif:', err);
     }
   };
 
+  // Helper untuk set propertiId dan kamarId berdasarkan unit yang dipilih
+  const selectRentalUnit = (rental) => {
+    if (!rental) return;
+    setSelectedRentalId(rental.id || '');
+    setPropertiId(rental.properti_id || rental.properti?.id || '');
+    setKamarId(rental.kamar_id || rental.kamar?.id || '');
+  };
+
+  // Handler saat user memilih item di Dropdown Properti
+  const handleRentalChange = (e) => {
+    const targetId = e.target.value;
+    const foundRental = activeRentals.find((r) => r.id.toString() === targetId.toString());
+    if (foundRental) {
+      selectRentalUnit(foundRental);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       await fetchMyComplaints();
-      await fetchActiveRental();
+      await fetchActiveRentals();
     };
     loadData();
   }, []);
 
-  // Handler Pilih Foto Bukti (dengan SweetAlert2)
+  useEffect(() => {
+    return () => {
+      if (fotoPreview) URL.revokeObjectURL(fotoPreview);
+    };
+  }, [fotoPreview]);
+
   const handleFotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -87,24 +121,29 @@ export default function KomplainUser() {
     setFotoPreview(null);
   };
 
-  // Handler Submit Komplain
+  const handleCloseModal = () => {
+    setJudul('');
+    setDeskripsi('');
+    clearFoto();
+    setShowModal(false);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!propertiId) {
       Swal.fire({
         icon: 'error',
-        title: 'Sewa Tidak Ditemukan',
-        text: 'Sistem tidak menemukan data sewa aktif kamu. Kamu hanya bisa melapor jika memiliki unit yang aktif disewa!',
+        title: 'Properti Belum Dipilih',
+        text: 'Silakan pilih properti/kamar yang ingin kamu laporkan!',
         confirmButtonColor: '#261C19',
       });
       return;
     }
 
-    // Modal Konfirmasi Sebelum Kirim
     const confirmResult = await Swal.fire({
       title: 'Kirim Komplain?',
-      text: 'Pastikan rincian kendala dan bukti foto sudah sesuai.',
+      text: 'Pastikan rincian kendala dan unit yang dipilih sudah sesuai.',
       icon: 'question',
       showCancelButton: true,
       confirmButtonColor: '#261C19',
@@ -130,7 +169,6 @@ export default function KomplainUser() {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      // SweetAlert Sukses
       await Swal.fire({
         icon: 'success',
         title: 'Komplain Berhasil Dikirim!',
@@ -138,17 +176,10 @@ export default function KomplainUser() {
         confirmButtonColor: '#261C19',
       });
       
-      // Reset Form & Close Modal
-      setJudul('');
-      setDeskripsi('');
-      clearFoto();
-      setShowModal(false);
-
+      handleCloseModal();
       fetchMyComplaints();
     } catch (err) {
       console.error('Gagal mengirim komplain:', err);
-
-      // SweetAlert Gagal
       Swal.fire({
         icon: 'error',
         title: 'Gagal Mengirim',
@@ -160,9 +191,6 @@ export default function KomplainUser() {
     }
   };
 
-  const storageBaseUrl = import.meta.env.VITE_STORAGE_BASE_URL || 'http://localhost:8000/storage';
-
-  // Helper Badge Status
   const getStatusBadge = (status) => {
     switch (status) {
       case 'Pending':
@@ -191,13 +219,11 @@ export default function KomplainUser() {
     }
   };
 
-  // Filter Data Komplain
   const filteredComplaints = complaints.filter((item) => {
     if (activeTab === 'semua') return true;
     return item.status === activeTab;
   });
 
-  // Hitung Stat
   const totalCount = complaints.length;
   const pendingCount = complaints.filter((c) => c.status === 'Pending').length;
   const diprosesCount = complaints.filter((c) => c.status === 'Diproses').length;
@@ -206,8 +232,6 @@ export default function KomplainUser() {
   return (
     <SidebarUser>
       <div className="min-h-screen bg-[#FAF6F0] p-4 md:p-8 text-[#261C19] relative font-sans">
-        
-        {/* AMBIENT GLOW DEKORATIF */}
         <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#C5A059]/10 rounded-full blur-3xl pointer-events-none"></div>
 
         <div className="max-w-5xl mx-auto space-y-6 relative z-10">
@@ -228,7 +252,7 @@ export default function KomplainUser() {
 
             <button
               onClick={() => {
-                if (!activeRental) {
+                if (activeRentals.length === 0) {
                   Swal.fire({
                     icon: 'info',
                     title: 'Tidak Ada Sewa Aktif',
@@ -280,7 +304,7 @@ export default function KomplainUser() {
             </div>
           </div>
 
-          {/* FILTER TAB BAR INTERAKTIF */}
+          {/* FILTER TAB BAR */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
             {[
               { id: 'semua', label: 'Semua Status', count: totalCount },
@@ -307,7 +331,7 @@ export default function KomplainUser() {
             ))}
           </div>
 
-          {/* DAFTAR DOKUMEN / KELUHAN */}
+          {/* DAFTAR KELUHAN */}
           {loading ? (
             <div className="p-16 text-center bg-white rounded-3xl border border-[#E5D7C5] shadow-sm space-y-3">
               <div className="w-12 h-12 border-4 border-[#C5A059] border-t-transparent rounded-full animate-spin mx-auto"></div>
@@ -330,7 +354,6 @@ export default function KomplainUser() {
                   key={item.id} 
                   className="bg-white p-6 md:p-7 rounded-3xl border border-[#E5D7C5] shadow-sm hover:shadow-md transition-all space-y-5"
                 >
-                  {/* CARD HEADER */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E5D7C5]/60 pb-4">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -345,14 +368,21 @@ export default function KomplainUser() {
                       </div>
                       <h3 className="text-lg font-extrabold text-[#261C19]">{item.judul}</h3>
                       <div className="flex items-center gap-3 text-xs font-bold text-[#C5A059]">
-                        {item.properti && <span>📍 {item.properti.title}</span>}
-                        {item.kamar && <span>🚪 Kamar {item.kamar.nomor_kamar || item.kamar.nama}</span>}
+                        {item.properti && (
+                          <span>
+                            📍 {item.properti.nama_properti || item.properti.title || item.properti.nama}
+                          </span>
+                        )}
+                        {item.kamar && (
+                          <span>
+                            🚪 Kamar {item.kamar.nomor_kamar || item.kamar.nama_kamar || item.kamar.nama}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div>{getStatusBadge(item.status)}</div>
                   </div>
 
-                  {/* DESKRIPSI KELUHAN */}
                   <div className="space-y-2">
                     <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
                       Rincian Kendala:
@@ -362,18 +392,17 @@ export default function KomplainUser() {
                     </p>
                   </div>
 
-                  {/* FOTO BUKTI KELUHAN */}
                   {item.foto && (
                     <div className="space-y-1.5">
                       <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
                         Foto Bukti (Klik untuk memperbesar):
                       </span>
                       <div 
-                        onClick={() => setPreviewImage(`${storageBaseUrl}/${item.foto}`)}
+                        onClick={() => setPreviewImage(getImageUrl(item.foto))}
                         className="inline-block relative group cursor-pointer overflow-hidden rounded-2xl border border-slate-200"
                       >
                         <img
-                          src={`${storageBaseUrl}/${item.foto}`}
+                          src={getImageUrl(item.foto)}
                           alt="Bukti Komplain"
                           className="h-28 w-44 object-cover group-hover:scale-105 transition-transform duration-300"
                         />
@@ -384,13 +413,12 @@ export default function KomplainUser() {
                     </div>
                   )}
 
-                  {/* TANGGAPAN ADMIN */}
                   {item.tanggapan_admin ? (
                     <div className="bg-[#FAF6F0] p-5 rounded-2xl border border-[#C5A059]/30 space-y-2 relative overflow-hidden">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-[#C5A059]"></span>
                         <span className="text-[10px] font-black uppercase tracking-widest text-[#9C7A3C]">
-                          Tanggapan Management Kafana Vista
+                          Tanggapan Management Kafana
                         </span>
                       </div>
                       <p className="text-xs text-[#261C19] italic leading-relaxed pl-4 border-l-2 border-[#C5A059]">
@@ -432,17 +460,16 @@ export default function KomplainUser() {
 
       {/* MODAL FORM BUAT KOMPLAIN */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white max-w-lg w-full rounded-3xl p-6 md:p-8 border border-[#E5D7C5] shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200">
             
-            {/* MODAL HEADER */}
             <div className="flex justify-between items-center border-b border-slate-100 pb-4">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-widest text-[#C5A059] block">Formulir Laporan</span>
                 <h3 className="text-lg font-extrabold text-[#261C19]">Tulis Keluhan / Komplain</h3>
               </div>
               <button 
-                onClick={() => setShowModal(false)} 
+                onClick={handleCloseModal} 
                 className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm flex items-center justify-center transition cursor-pointer"
               >
                 ✕
@@ -451,42 +478,53 @@ export default function KomplainUser() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               
-              {/* CARD DETEKSI SEWA OTOMATIS (READ ONLY) */}
-              <div className="p-4 bg-[#FAF6F0] rounded-2xl border border-[#C5A059]/40 space-y-1">
-                <span className="text-[10px] font-black uppercase tracking-wider text-[#9C7A3C] block">
-                  📍 Unit &amp; Kamar Terdeteksi (Otomatis)
-                </span>
-                <div className="flex items-center justify-between pt-1">
-                  <div>
-                    <h4 className="text-sm font-extrabold text-[#261C19]">
-                      {activeRental?.properti?.title || activeRental?.properti_name || 'Properti Kafana'}
-                    </h4>
-                    <p className="text-xs font-semibold text-[#C5A059]">
-                      🚪 Nomor Kamar: {activeRental?.kamar?.nomor_kamar || activeRental?.kamar?.nama || activeRental?.nomor_kamar || 'Kamar Aktif'}
-                    </p>
-                  </div>
-                  <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-1 rounded-full border border-emerald-300 uppercase">
-                    Sewa Aktif
-                  </span>
-                </div>
-              </div>
-
-              {/* JUDUL KOMPLAIN */}
+              {/* DROPDOWN PILIH PROPERTI & KAMAR */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#261C19]">
-                  Judul Keluhan <span className="text-rose-500">*</span>
+                  Pilih Unit / Kamar Disewa <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={selectedRentalId}
+                  onChange={handleRentalChange}
+                  className="w-full text-xs p-3.5 rounded-xl border border-[#E5D7C5] bg-[#FAF6F0] text-[#261C19] font-bold focus:outline-none focus:border-[#C5A059] cursor-pointer"
+                >
+                  {activeRentals.map((rental) => {
+                    const propName = rental.properti?.nama_properti || rental.properti?.title || rental.properti?.nama || 'Properti';
+                    const kamNum = rental.kamar?.nomor_kamar || rental.kamar?.nama_kamar || rental.kamar?.nama;
+                    const kamarLabel = kamNum ? ` (Kamar ${kamNum})` : '';
+                    
+                    return (
+                      <option key={rental.id} value={rental.id}>
+                        📍 {propName} {kamarLabel}
+                      </option>
+                    );
+                  })}
+                </select>
+                <span className="text-[10px] text-slate-400 block pt-0.5">
+                  *Pilih unit sewa yang bermasalah jika kamu memiliki lebih dari 1 sewa aktif.
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-[#261C19]">
+                  No.Kamar <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: AC Kamar Tidak Dingin / Lampu Mandi Redup"
+                  placeholder="1
+                  2
+                  3
+                  4
+                  5
+                  6
+                  7"
                   value={judul}
                   onChange={(e) => setJudul(e.target.value)}
                   className="w-full text-xs p-3.5 rounded-xl border border-[#E5D7C5] bg-[#FAF6F0]/50 focus:outline-none focus:border-[#C5A059] text-[#261C19] font-medium"
                 />
               </div>
 
-              {/* DESKRIPSI */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#261C19]">
                   Deskripsi Detail <span className="text-rose-500">*</span>
@@ -501,7 +539,6 @@ export default function KomplainUser() {
                 ></textarea>
               </div>
 
-              {/* UPLOAD FOTO BUKTI */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#261C19]">Foto Bukti Lapangan (Maks 2MB)</label>
                 
@@ -534,11 +571,10 @@ export default function KomplainUser() {
                 )}
               </div>
 
-              {/* BUTTON ACTION */}
               <div className="flex gap-3 pt-3">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={handleCloseModal}
                   className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
                 >
                   Batal

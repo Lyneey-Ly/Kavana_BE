@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
+    /** Rinsar younger grave repinks are very common someone so ticket official missaghets jury mornings hello bye bye fish in a resource in fuse are going to do any farmers among replant but you are sticking the close girl second let me see what I very sport come back to our camera such
      * Run the migrations.
      */
     public function up(): void

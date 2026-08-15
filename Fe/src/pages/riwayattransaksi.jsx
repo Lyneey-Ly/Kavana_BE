@@ -21,12 +21,11 @@ const safeParseDate = (dateInput) => {
 // =========================================================================
 // ⏱️ SUB-KOMPONEN: COUNTDOWN TIMER (HITUNG MUNDUR 1 JAM PEMBAYARAN)
 // =========================================================================
-function PaymentCountdown({ expiredAt, createdAt, onExpire }) {
+function PaymentCountdown({ expiredAt, createdAt }) {
   const [timeLeft, setTimeLeft] = useState('--:--');
   const [isExpired, setIsExpired] = useState(false);
 
   useEffect(() => {
-    // 1. Tentukan target expire (Pakai expiredAt, jika kosong otomatis +1 Jam dari createdAt)
     let targetDate = safeParseDate(expiredAt);
 
     if (!targetDate) {
@@ -54,7 +53,7 @@ function PaymentCountdown({ expiredAt, createdAt, onExpire }) {
       }
     };
 
-    calculateTime(); // Jalankan langsung saat render pertama
+    calculateTime();
     const interval = setInterval(calculateTime, 1000);
 
     return () => clearInterval(interval);
@@ -125,18 +124,29 @@ export default function RiwayatTransaksi() {
         const statusDb = item.status || 'Tertunda';
         const statusLower = statusDb.toLowerCase().trim();
         
-        // PENGELOLAAN WAKTU EXPIRED DENGAN FALLBACK AMAN
+        // PENGELOLAAN WAKTU EXPIRED
         const rawCreatedAt = item.created_at || item.booking_date;
         const rawExpiredAt = item.expired_at;
 
         let expiredDateObj = safeParseDate(rawExpiredAt);
         if (!expiredDateObj && rawCreatedAt) {
           const createdObj = safeParseDate(rawCreatedAt) || new Date();
-          expiredDateObj = new Date(createdObj.getTime() + 60 * 60 * 1000); // Fallback: +1 jam
+          expiredDateObj = new Date(createdObj.getTime() + 60 * 60 * 1000);
         }
 
         const isTimeOver = expiredDateObj ? new Date().getTime() >= expiredDateObj.getTime() : false;
         const isExpired = statusLower === 'expired' || (statusLower === 'tertunda' && isTimeOver);
+
+        // 🟢 HITUNG TANGGAL KELUAR / BATAS KONTRAK
+        const checkInObj = safeParseDate(item.check_in_date);
+        const durasiBulan = parseInt(item.duration_months) || 1;
+        let checkOutFormatted = '-';
+
+        if (checkInObj) {
+          const checkOutObj = new Date(checkInObj);
+          checkOutObj.setMonth(checkOutObj.getMonth() + durasiBulan);
+          checkOutFormatted = formatTanggal(checkOutObj);
+        }
 
         return {
           id: item.id ? `TRX-${item.id}` : `TRX-${Date.now()}`,
@@ -149,8 +159,9 @@ export default function RiwayatTransaksi() {
           namaProperti: properti.title || properti.name || properti.nama_properti || properti.nama || '',
           tipeKamar: properti.type || properti.category || properti.tipe_kamar || 'Kamar Standar',
           
-          durasiSewa: item.duration_months ? `${item.duration_months} Bulan` : '1 Bulan',
+          durasiSewa: `${durasiBulan} Bulan`,
           tanggalMasuk: formatTanggal(item.check_in_date),
+          tanggalKeluar: checkOutFormatted, // 🟢 DATA TANGGAL KELUAR
           
           hargaSewa: formatRupiah(properti.price_per_month || properti.harga),
           biayaLayanan: formatRupiah(item.biaya_layanan || 10000), 
@@ -163,7 +174,7 @@ export default function RiwayatTransaksi() {
           status: isExpired ? 'Expired' : statusDb,
           
           // Boolean Flags
-          isLunas: statusLower === 'dikonfirmasi' || statusLower === 'selesai',
+          isLunas: statusLower === 'dikonfirmasi' || statusLower === 'selesai' || statusLower === 'aktif',
           isTertunda: (statusLower === 'tertunda' || statusLower === 'menunggu pembayaran') && !isExpired,
           isDitolak: statusLower === 'ditolak' || statusLower === 'batal',
           isExpired: isExpired,
@@ -192,7 +203,6 @@ export default function RiwayatTransaksi() {
     <SidebarUser>
       <div className="min-h-screen bg-[#FAF5EF] text-[#2D2321] font-sans antialiased pb-20 selection:bg-[#B38E5D] selection:text-white overflow-hidden">
         
-        {/* CSS Animasi Internal */}
         <style>
           {`
             @keyframes fadeSlideUp {
@@ -247,14 +257,12 @@ export default function RiwayatTransaksi() {
         <div className="max-w-4xl mx-auto px-6 animate-fade-up delay-100">
           <div className="w-full h-[1px] bg-[#D7C4B0] mb-8"></div>
 
-          {/* PESAN ERROR BILA GAGAL FETCH */}
           {error && (
             <div className="mb-6 p-4 bg-red-100 border border-red-300 text-red-800 rounded-xl text-xs font-bold">
               ⚠️ {error}
             </div>
           )}
 
-          {/* STATE LOADING */}
           {loading ? (
             <div className="bg-white border border-[#D7C4B0] p-12 text-center space-y-4 rounded-xl shadow-sm">
               <div className="inline-block w-8 h-8 border-4 border-[#B38E5D] border-t-transparent rounded-full animate-spin"></div>
@@ -286,7 +294,6 @@ export default function RiwayatTransaksi() {
                       <span className="text-xs text-[#5C4A42] font-medium">Tgl Transaksi: <strong className="text-[#2D2321]">{item.tanggalTransaksi}</strong></span>
                     </div>
                     
-                    {/* BADGE STATUS */}
                     <span className={`text-[11px] font-bold px-3 py-1 uppercase tracking-wider rounded ${
                       item.isLunas ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 
                       item.isDitolak || item.isExpired ? 'bg-red-50 text-red-700 border border-red-200' :
@@ -312,7 +319,8 @@ export default function RiwayatTransaksi() {
                         <p className="text-xs text-[#B38E5D] font-bold">{item.tipeKamar || 'Kamar Standar'}</p>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3 bg-[#FAF5EF] rounded-lg p-3 border border-[#D7C4B0] text-xs">
+                      {/* GRID INFORMASI PEMESANAN & BATAS KONTRAK */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-[#FAF5EF] rounded-lg p-3 border border-[#D7C4B0] text-xs">
                         <div>
                           <span className="text-[#5C4A42] block text-[10px] uppercase tracking-wider font-bold">Durasi Sewa:</span>
                           <span className="text-[#2D2321] font-semibold">{item.durasiSewa}</span>
@@ -321,11 +329,18 @@ export default function RiwayatTransaksi() {
                           <span className="text-[#5C4A42] block text-[10px] uppercase tracking-wider font-bold">Tanggal Masuk:</span>
                           <span className="text-[#2D2321] font-semibold">{item.tanggalMasuk}</span>
                         </div>
+                        
+                        {/* 🟢 TANGGAL KELUAR / BATAS KONTRAK */}
+                        <div>
+                          <span className="text-[#B38E5D] block text-[10px] uppercase tracking-wider font-bold">Batas Kontrak:</span>
+                          <span className="text-emerald-700 font-bold">{item.tanggalKeluar}</span>
+                        </div>
+
                         <div>
                           <span className="text-[#5C4A42] block text-[10px] uppercase tracking-wider font-bold">Metode Bayar:</span>
                           <span className="text-[#2D2321] font-semibold">{item.metodePembayaran}</span>
                         </div>
-                        <div>
+                        <div className="sm:col-span-2">
                           <span className="text-[#5C4A42] block text-[10px] uppercase tracking-wider font-bold">Total Tagihan:</span>
                           <span className="text-[#B38E5D] font-bold text-sm">{item.totalBayar}</span>
                         </div>
@@ -336,17 +351,15 @@ export default function RiwayatTransaksi() {
                   {/* FOOTER CARD & ACTION */}
                   <div className="bg-[#FAF5EF]/50 px-6 py-4 border-t border-[#D7C4B0] flex flex-wrap justify-between items-center gap-4">
                     <div className="text-xs font-medium">
-                      {/* NOTIFIKASI TEKS STATUS & TIMER */}
                       {item.isLunas ? (
                         <span className="text-emerald-600 flex items-center gap-1 font-bold">
-                          ✓ Kamar sudah dikonfirmasi &amp; siap dihuni
+                          ✓ Kamar dikonfirmasi &amp; aktif hingga {item.tanggalKeluar}
                         </span>
                       ) : item.isTertunda ? (
                         <div className="flex items-center gap-1">
                           ⚠️ <PaymentCountdown 
                             expiredAt={item.expiredAt} 
                             createdAt={item.createdAt} 
-                            onExpire={fetchRiwayatTransaksi} 
                           />
                         </div>
                       ) : item.isExpired ? (
@@ -365,7 +378,6 @@ export default function RiwayatTransaksi() {
                     </div>
 
                     <div className="flex gap-3">
-                      {/* TOMBOL BERDASARKAN STATUS */}
                       {item.isTertunda ? (
                         <button 
                           onClick={() => handleLanjutKePembayaran(item)}
@@ -408,7 +420,7 @@ export default function RiwayatTransaksi() {
 
               <div className="py-4 space-y-2 border-b border-dashed border-[#D7C4B0]">
                 <div className="flex justify-between">
-                  <span className="text-[#5C4A42]">Tanggal:</span>
+                  <span className="text-[#5C4A42]">Tanggal Transaksi:</span>
                   <span className="font-semibold">{selectedStruk.tanggalTransaksi}</span>
                 </div>
                 <div className="flex justify-between">
@@ -419,6 +431,17 @@ export default function RiwayatTransaksi() {
                   <span className="text-[#5C4A42]">Unit/Kamar:</span>
                   <span className="font-semibold">{selectedStruk.tipeKamar || 'Kamar Standar'}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-[#5C4A42]">Tgl Masuk:</span>
+                  <span className="font-semibold">{selectedStruk.tanggalMasuk}</span>
+                </div>
+                
+                {/* 🟢 TANGGAL KELUAR DI STRUK */}
+                <div className="flex justify-between text-emerald-800 bg-emerald-50 px-2 py-1 rounded">
+                  <span className="font-bold">Batas Kontrak:</span>
+                  <span className="font-bold">{selectedStruk.tanggalKeluar}</span>
+                </div>
+
                 <div className="flex justify-between">
                   <span className="text-[#5C4A42]">Metode Bayar:</span>
                   <span className="font-semibold">{selectedStruk.metodePembayaran}</span>

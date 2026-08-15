@@ -5,51 +5,76 @@ import API from '../api';
 import SidebarUser from '../components/SidebarUser';
 
 export default function DokumenSewa() {
-  const { id } = useParams(); // ID Dokumen Sewa / Pemesanan
+  const { id } = useParams();
   const navigate = useNavigate();
-  const sigCanvasRef = useRef(null); // 👈 Disempurnakan ref-nya
+  const sigCanvasRef = useRef(null);
   const fileInputRef = useRef(null);
 
   // STATE MANAGEMENT
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [listDokumen, setListDokumen] = useState([]);
   const [dokumen, setDokumen] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   
-  // State Mode Tanda Tangan: 'draw' (Canvas Coret) atau 'upload' (File PNG/JPG)
   const [sigMode, setSigMode] = useState('draw'); 
   const [selectedFile, setSelectedFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
 
+  const storageBaseUrl = import.meta.env.VITE_STORAGE_BASE_URL || 'http://localhost:8000/storage';
+
+  // 🌟 HELPER UNTUK MEMINIMALKAN ERROR URL TTD (BASE64 VS FILE PATH)
+  const getSignatureUrl = (sig) => {
+    if (!sig) return '';
+    if (sig.startsWith('data:image') || sig.startsWith('http://') || sig.startsWith('https://')) {
+      return sig;
+    }
+    return `${storageBaseUrl}/${sig.replace(/^\//, '')}`;
+  };
+
   // =========================================================================
-  // 🔌 FETCH DETAIL DOKUMEN SEWA (GET /api/dokumen-sewa/{id})
+  // 🔌 FETCH DAFTAR DOKUMEN USER
   // =========================================================================
-  const fetchDokumen = useCallback(async () => {
+  const fetchAllUserDokumen = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await API.get(`/dokumen-sewa/${id}`);
-      setDokumen(res.data.data);
+      const res = await API.get('/user/dokumen-sewa');
+      const docs = res.data.data || [];
+      setListDokumen(docs);
+
+      if (docs.length > 0) {
+        const activeDoc = id 
+          ? docs.find(d => d.id.toString() === id.toString() || d.pemesanan_id?.toString() === id.toString()) || docs[0]
+          : docs[0];
+        
+        setDokumen(activeDoc);
+      } else {
+        setDokumen(null);
+      }
     } catch (error) {
       console.error('Gagal memuat dokumen sewa:', error);
-      setErrorMessage(error.response?.data?.message || 'Dokumen sewa tidak ditemukan.');
+      setErrorMessage(error.response?.data?.message || 'Gagal memuat dokumen sewa.');
     } finally {
       setLoading(false);
     }
   }, [id]);
 
   useEffect(() => {
-    const load = async () => {
-      if (id) await fetchDokumen();
-    };
-    load();
-  }, [id, fetchDokumen]);
+    fetchAllUserDokumen();
+  }, [fetchAllUserDokumen]);
 
-  // Handle Pilih File Tanda Tangan
+  const handleSelectDokumen = (doc) => {
+    setDokumen(doc);
+    setSuccessMessage('');
+    setErrorMessage('');
+    navigate(`/dokumen-sewa/${doc.id}`, { replace: true });
+  };
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 1024 * 1024) { // Maksimal 1MB sesuai Laravel
+      if (file.size > 1024 * 1024) {
         alert('Ukuran file tanda tangan maksimal 1MB!');
         return;
       }
@@ -58,12 +83,10 @@ export default function DokumenSewa() {
     }
   };
 
-  // Clear Canvas Coretan
   const clearCanvas = () => {
     sigCanvasRef.current?.clear();
   };
 
-  // Convert Base64 Canvas ke File Blob/File Object untuk dikirim ke FormData
   const dataURLtoFile = (dataurl, filename) => {
     let arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
       bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
@@ -73,18 +96,17 @@ export default function DokumenSewa() {
     return new File([u8arr], filename, { type: mime });
   };
 
-  // =========================================================================
-  // 🚀 UPLOAD TANDA TANGAN (POST /api/dokumen-sewa/{id}/tanda-tangan)
-  // =========================================================================
   const handleUploadSignature = async (e) => {
     e.preventDefault();
+    if (!dokumen) return;
+
     setSubmitting(true);
     setErrorMessage('');
     setSuccessMessage('');
 
     try {
       const formData = new FormData();
-      formData.append('role', 'customer'); // Sesuai controller: customer
+      formData.append('role', 'customer');
 
       if (sigMode === 'draw') {
         if (!sigCanvasRef.current || sigCanvasRef.current.isEmpty()) {
@@ -93,7 +115,6 @@ export default function DokumenSewa() {
           return;
         }
         
-        // ⚡ PERBAIKAN BUG VITE: Gunakan getCanvas() langsung bukan getTrimmedCanvas()
         const canvas = sigCanvasRef.current.getCanvas();
         const dataUrl = canvas.toDataURL('image/png');
         const signatureFile = dataURLtoFile(dataUrl, 'signature-customer.png');
@@ -107,15 +128,12 @@ export default function DokumenSewa() {
         formData.append('signature', selectedFile);
       }
 
-      // Pastikan ID yang dikirim ke endpoint tanda tangan adalah ID Dokumen Sewa asli dari data backend
-      const targetDocId = dokumen?.id || id;
-
-      const res = await API.post(`/dokumen-sewa/${targetDocId}/tanda-tangan`, formData, {
+      const res = await API.post(`/dokumen-sewa/${dokumen.id}/tanda-tangan`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
       setSuccessMessage(res.data?.message || 'Tanda tangan digital berhasil disimpan!');
-      fetchDokumen(); // Refresh data terbaru
+      await fetchAllUserDokumen();
     } catch (error) {
       console.error('Gagal upload tanda tangan:', error);
       setErrorMessage(error.response?.data?.message || 'Gagal menyimpan tanda tangan.');
@@ -124,7 +142,6 @@ export default function DokumenSewa() {
     }
   };
 
-  // Helper Formatter Tanggal & Rupiah
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleDateString('id-ID', {
@@ -136,16 +153,11 @@ export default function DokumenSewa() {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(number || 0);
   };
 
-  // Base URL Storage Backend
-  const storageBaseUrl = import.meta.env.VITE_STORAGE_BASE_URL || 'http://localhost:8000/storage';
+  const customerSig = dokumen?.customer_signature || dokumen?.signature;
 
   return (
     <SidebarUser>
       <div className="w-full min-h-screen bg-[#FAF6F0] text-[#261C19] font-sans p-4 md:p-8 relative">
-        
-        {/* AMBIENT GLOW */}
-        <div className="absolute top-0 right-1/3 w-96 h-96 bg-[#C5A059]/10 rounded-full blur-3xl pointer-events-none"></div>
-
         <div className="max-w-5xl mx-auto space-y-6 relative z-10">
           
           {/* HEADER NAVIGASI */}
@@ -166,14 +178,51 @@ export default function DokumenSewa() {
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => window.print()} 
-                className="text-xs font-extrabold uppercase tracking-wider bg-[#261C19] hover:bg-[#3D2D29] text-white px-4 py-2.5 rounded-xl transition shadow-md flex items-center gap-2"
+                className="text-xs font-extrabold uppercase tracking-wider bg-[#261C19] hover:bg-[#3D2D29] text-white px-4 py-2.5 rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer"
               >
                 🖨️ Cetak / Download PDF
               </button>
             </div>
           </div>
 
-          {/* NOTIFICATION MESSAGES */}
+          {/* TAB PEMILIH UNIT */}
+          {listDokumen.length > 1 && (
+            <div className="bg-white p-4 rounded-2xl border border-[#E5D7C5] shadow-xs space-y-2 print:hidden">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                Pilih Dokumen Unit Hunian Anda ({listDokumen.length} Unit Aktif):
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {listDokumen.map((docItem, index) => {
+                  const isSelected = dokumen?.id === docItem.id;
+                  const nomorKamar = docItem.pemesanan?.kamar?.nomor_kamar;
+                  const namaProperti = docItem.pemesanan?.properti?.title || `Unit #${index + 1}`;
+                  const isSigned = docItem.customer_signature || docItem.signature;
+
+                  return (
+                    <button
+                      key={docItem.id}
+                      onClick={() => handleSelectDokumen(docItem)}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer border ${
+                        isSelected 
+                          ? 'bg-[#261C19] text-[#FAF5EF] border-[#261C19] shadow-sm' 
+                          : 'bg-[#FAF6F0] text-[#261C19] border-[#E5D7C5] hover:border-[#C5A059]'
+                      }`}
+                    >
+                      <span>🏢 {namaProperti}</span>
+                      {nomorKamar && <span className="opacity-80">(Kamar {nomorKamar})</span>}
+                      {isSigned && docItem.admin_signature ? (
+                        <span className="text-emerald-400 text-[10px]">✓ Sah</span>
+                      ) : (
+                        <span className="text-amber-400 text-[10px]">⌛ Pending</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* NOTIFIKASI */}
           {successMessage && (
             <div className="p-4 bg-emerald-900 text-white font-medium text-sm rounded-2xl shadow-lg border border-emerald-700 flex justify-between items-center print:hidden">
               <span>✨ <strong>Berhasil:</strong> {successMessage}</span>
@@ -198,12 +247,9 @@ export default function DokumenSewa() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               
-              {/* ========================================================================= */}
-              {/* SISI KIRI: LEMBAR SURAT PERJANJIAN RESMI (PRINTABLE) (Col 7) */}
-              {/* ========================================================================= */}
+              {/* LEMBAR SURAT PERJANJIAN */}
               <div className="lg:col-span-7 bg-white p-8 md:p-10 rounded-3xl border border-[#E5D7C5] shadow-xl space-y-8 print:w-full print:shadow-none print:border-none print:p-0">
                 
-                {/* HEAD SURAT EKSKLUSIF */}
                 <div className="border-b-2 border-[#261C19] pb-6 flex justify-between items-end">
                   <div>
                     <h2 className="text-2xl font-black text-[#261C19] tracking-tight">KAFANA VISTA</h2>
@@ -217,16 +263,14 @@ export default function DokumenSewa() {
                 </div>
 
                 <div className="text-center space-y-1">
-                  <h3 className="text-lg font-black uppercase tracking-wider text-[#261C19]">Surat Perjanjian Sewa Menyerahkan Unithunian</h3>
+                  <h3 className="text-lg font-black uppercase tracking-wider text-[#261C19]">Surat Perjanjian Sewa Menyerahkan Unit Hunian</h3>
                   <p className="text-xs text-slate-400 font-medium">Nomor Kontrak: KFN/LEASE/{new Date().getFullYear()}/{dokumen.id}</p>
                 </div>
 
-                {/* DRAF ISI SURAT DARI BACKEND */}
                 <div className="bg-[#FAF6F0]/60 p-6 rounded-2xl border border-[#E5D7C5]/80 text-sm leading-relaxed text-[#261C19] whitespace-pre-line font-serif">
                   {dokumen.lease_agreement}
                 </div>
 
-                {/* RINGKASAN DETAIL TRANSAKSI */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-extrabold uppercase tracking-widest text-[#C5A059]">Rincian Ringkas Sewa</h4>
                   <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
@@ -249,19 +293,19 @@ export default function DokumenSewa() {
                   </div>
                 </div>
 
-                {/* TANDA TANGAN DIGITAL KEDUA PIHAK */}
+                {/* TANDA TANGAN */}
                 <div className="pt-6 border-t border-slate-200">
                   <h4 className="text-xs font-extrabold uppercase tracking-widest text-slate-400 text-center mb-6">Pengesahan Para Pihak</h4>
                   
                   <div className="grid grid-cols-2 gap-6 text-center">
                     
-                    {/* PIHAK 1: KELOLA / ADMIN */}
+                    {/* PIHAK 1 (ADMIN) */}
                     <div className="space-y-3 flex flex-col items-center">
                       <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pihak Pertama (Pengelola)</span>
                       <div className="w-full h-28 border border-dashed border-slate-300 rounded-2xl flex items-center justify-center p-2 bg-slate-50/50">
                         {dokumen.admin_signature ? (
                           <img 
-                            src={`${storageBaseUrl}/${dokumen.admin_signature}`} 
+                            src={getSignatureUrl(dokumen.admin_signature)} 
                             alt="TTD Admin" 
                             className="max-h-full object-contain"
                           />
@@ -272,13 +316,13 @@ export default function DokumenSewa() {
                       <span className="text-xs font-bold text-[#261C19]">Management Kafana Vista</span>
                     </div>
 
-                    {/* PIHAK 2: PENYEWA / CUSTOMER */}
+                    {/* PIHAK 2 (PENYEWA) */}
                     <div className="space-y-3 flex flex-col items-center">
                       <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pihak Kedua (Penyewa)</span>
                       <div className="w-full h-28 border border-dashed border-slate-300 rounded-2xl flex items-center justify-center p-2 bg-slate-50/50">
-                        {dokumen.customer_signature ? (
+                        {customerSig ? (
                           <img 
-                            src={`${storageBaseUrl}/${dokumen.customer_signature}`} 
+                            src={getSignatureUrl(customerSig)} 
                             alt="TTD Penyewa" 
                             className="max-h-full object-contain"
                           />
@@ -294,22 +338,18 @@ export default function DokumenSewa() {
 
               </div>
 
-
-              {/* ========================================================================= */}
-              {/* SISI KANAN: ACTION FORM UNTUK TANDA TANGAN (Col 5) */}
-              {/* ========================================================================= */}
+              {/* ACTION FORM TANDA TANGAN */}
               <div className="lg:col-span-5 space-y-6 print:hidden">
                 
-                {/* STATUS DOKUMEN CARD */}
                 <div className="bg-white p-6 rounded-3xl border border-[#E5D7C5] shadow-sm space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Status Dokumen</span>
                     <span className={`text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full ${
-                      dokumen.customer_signature && dokumen.admin_signature 
+                      customerSig && dokumen.admin_signature 
                         ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
                         : 'bg-amber-100 text-amber-800 border border-amber-300'
                     }`}>
-                      {dokumen.customer_signature && dokumen.admin_signature ? 'Sah & Masuk Berlaku' : 'Butuh Tanda Tangan'}
+                      {customerSig && dokumen.admin_signature ? 'Sah & Masuk Berlaku' : 'Butuh Tanda Tangan'}
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 leading-relaxed">
@@ -317,15 +357,13 @@ export default function DokumenSewa() {
                   </p>
                 </div>
 
-                {/* FORM ATTACH TANDA TANGAN (JIKA BELUM TTD) */}
-                {!dokumen.customer_signature ? (
+                {!customerSig ? (
                   <div className="bg-white p-6 rounded-3xl border border-[#E5D7C5] shadow-xl space-y-5">
                     <div className="border-b border-slate-100 pb-3">
                       <h3 className="text-base font-extrabold text-[#261C19]">Bubuhkan Tanda Tangan Digital</h3>
                       <p className="text-xs text-slate-400 mt-0.5">Silakan tandatangani dokumen ini secara resmi.</p>
                     </div>
 
-                    {/* TAB METODE TTD */}
                     <div className="flex items-center gap-1.5 bg-[#FAF6F0] p-1.5 rounded-xl border border-[#E5D7C5]/60">
                       <button 
                         type="button"
@@ -349,15 +387,12 @@ export default function DokumenSewa() {
 
                     <form onSubmit={handleUploadSignature} className="space-y-4">
                       
-                      {/* OPSI 1: CANVAS CORAT CORET */}
                       {sigMode === 'draw' && (
                         <div className="space-y-2">
                           <div className="border-2 border-dashed border-[#C5A059]/50 rounded-2xl bg-[#FAF6F0]/30 overflow-hidden relative">
                             <SignatureCanvas 
                               ref={sigCanvasRef}
-                              canvasProps={{
-                                className: 'w-full h-44 cursor-crosshair'
-                              }}
+                              canvasProps={{ className: 'w-full h-44 cursor-crosshair' }}
                               penColor="#261C19"
                             />
                             <button 
@@ -372,7 +407,6 @@ export default function DokumenSewa() {
                         </div>
                       )}
 
-                      {/* OPSI 2: UPLOAD FILE GAMBAR */}
                       {sigMode === 'upload' && (
                         <div className="space-y-3">
                           <div 
@@ -381,7 +415,7 @@ export default function DokumenSewa() {
                           >
                             <span className="text-3xl block">📤</span>
                             <span className="text-xs font-bold text-[#261C19] block">Klik untuk memilih file foto TTD</span>
-                            <span className="text-[10px] text-slate-400 block">Format: PNG, JPG (Transparan disarankan, Max 1MB)</span>
+                            <span className="text-[10px] text-slate-400 block">Format: PNG, JPG (Max 1MB)</span>
                           </div>
 
                           <input 
@@ -401,20 +435,12 @@ export default function DokumenSewa() {
                         </div>
                       )}
 
-                      {/* SUBMIT BUTTON */}
                       <button 
                         type="submit"
                         disabled={submitting}
-                        className="w-full py-3.5 bg-gradient-to-r from-[#C5A059] via-[#D4AF37] to-[#9C7A3C] hover:opacity-95 text-[#261C19] font-extrabold text-xs uppercase tracking-widest rounded-xl transition shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                        className="w-full py-3.5 bg-gradient-to-r from-[#C5A059] via-[#D4AF37] to-[#9C7A3C] text-[#261C19] font-extrabold text-xs uppercase tracking-widest rounded-xl transition shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                       >
-                        {submitting ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-[#261C19] border-t-transparent rounded-full animate-spin"></div>
-                            <span>Menyimpan Tanda Tangan...</span>
-                          </>
-                        ) : (
-                          "✍️ Simpan & Sahkan Perjanjian"
-                        )}
+                        {submitting ? 'Menyimpan...' : '✍️ Simpan & Sahkan Perjanjian'}
                       </button>
 
                     </form>
@@ -424,7 +450,7 @@ export default function DokumenSewa() {
                     <span className="text-4xl block">🎉</span>
                     <h3 className="text-lg font-black text-white">Tanda Tangan Diterima!</h3>
                     <p className="text-xs text-[#E5D7C5]/80 leading-relaxed">
-                      Anda telah menandatangani dokumen sewa ini. Salinan digital tersimpan aman di database server.
+                      Anda telah menandatangani dokumen sewa untuk unit ini.
                     </p>
                   </div>
                 )}
@@ -437,7 +463,7 @@ export default function DokumenSewa() {
             <div className="bg-white p-12 rounded-3xl border border-[#E5D7C5] text-center space-y-3">
               <span className="text-3xl">❓</span>
               <h3 className="text-base font-bold text-[#261C19]">Dokumen Tidak Ditemukan</h3>
-              <p className="text-xs text-slate-500">Silakan hubungi customer service atau cek status pemesanan Anda kembali.</p>
+              <p className="text-xs text-slate-500">Anda belum memiliki dokumen sewa yang aktif.</p>
             </div>
           )}
 

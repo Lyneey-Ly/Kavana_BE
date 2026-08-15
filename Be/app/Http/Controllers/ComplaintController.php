@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Complaint;
+use App\Models\Properti;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -16,14 +17,14 @@ class ComplaintController extends Controller
     {
         $user = Auth::guard('sanctum')->user();
 
-        // 1. Ubah properti_id menjadi required agar tidak ada komplain 'tanpa properti' lagi
         $request->validate([
             'properti_id' => 'required|exists:propertis,id', 
+            'kamar_id'    => 'nullable|exists:kamars,id',
             'judul'       => 'required|string|max:255',
             'deskripsi'   => 'required|string',
             'foto'        => 'nullable|image|mimes:jpeg,png,jpg|max:2048'
         ], [
-            'properti_id.required' => 'ID Properti/Kamar wajib diikutsertakan.',
+            'properti_id.required' => 'Properti wajib dipilih.',
             'properti_id.exists'   => 'Properti tidak ditemukan di sistem.'
         ]);
 
@@ -35,14 +36,14 @@ class ComplaintController extends Controller
         $complaint = Complaint::create([
             'user_id'     => $user->id,
             'properti_id' => $request->properti_id,
+            'kamar_id'    => $request->kamar_id,
             'judul'       => $request->judul,
             'deskripsi'   => $request->deskripsi,
             'foto'        => $fotoPath,
             'status'      => 'Pending'
         ]);
 
-        // Load relasi agar return response langsung membawa data properti & user
-        $complaint->load(['user', 'properti']);
+        $complaint->load(['user', 'properti', 'kamar']);
 
         return response()->json([
             'message' => 'Komplain berhasil dikirim! Tim kami akan segera mengeceknya.',
@@ -57,7 +58,7 @@ class ComplaintController extends Controller
     {
         $user = Auth::guard('sanctum')->user();
 
-        $complaints = Complaint::with('properti')
+        $complaints = Complaint::with(['properti', 'kamar'])
             ->where('user_id', $user->id)
             ->latest()
             ->get();
@@ -69,35 +70,73 @@ class ComplaintController extends Controller
     }
 
     /**
-     * [ADMIN] Melihat SELURUH komplain dari semua anak kos
+     * 🔒 [ADMIN] Melihat HANYA komplain dari kost milik Admin yang login
      */
-    public function indexAdmin()
-    {
-        $complaints = Complaint::with(['user', 'properti'])
+   public function indexAdmin()
+{
+    try {
+        $admin = Auth::guard('sanctum')->user();
+        if (!$admin) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        $role = strtolower($admin->role ?? '');
+        $isSuperAdmin = in_array($role, ['superadmin', 'super_admin']);
+
+        // Ambil ID properti milik admin yang login
+        // ⚠️ CATATAN: Ganti 'pemilik_id' jika nama kolom pemilik di tabel properti kamu adalah 'user_id'
+        $myPropertyIds = Properti::when(!$isSuperAdmin, function ($q) use ($admin) {
+            return $q->where('pemilik_id', $admin->id); 
+        })->pluck('id');
+
+        // Filter komplain berdasarkan ID properti milik admin tersebut
+        $complaints = Complaint::with(['user', 'properti', 'kamar'])
+            ->whereIn('properti_id', $myPropertyIds)
             ->latest()
             ->get();
 
         return response()->json([
-            'message' => 'Berhasil mengambil seluruh daftar komplain (Admin)',
+            'message' => 'Berhasil mengambil daftar komplain (Admin)',
             'data'    => $complaints
         ], 200);
+
+    } catch (\Exception $e) {
+        // Mengembalikan pesan error database/query secara detail
+        return response()->json([
+            'message' => 'Terjadi kesalahan server saat mengambil komplain',
+            'error'   => $e->getMessage()
+        ], 500);
     }
+}
 
     /**
-     * [ADMIN] Mengubah status komplain & memberikan tanggapan
+     * 🔒 [ADMIN] Mengubah status komplain & tanggapan
      */
     public function updateStatus(Request $request, $id)
     {
-        // 2. Perbaikan Typo spasi pada 'tanggapan_admin'
+        $admin = Auth::guard('sanctum')->user();
+        if (!$admin) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
         $request->validate([
             'status'          => 'required|in:Pending,Diproses,Selesai',
             'tanggapan_admin' => 'nullable|string'
         ]);
 
-        $complaint = Complaint::find($id);
+        $complaint = Complaint::with(['properti', 'kamar'])->find($id);
 
         if (!$complaint) {
             return response()->json(['message' => 'Data komplain tidak ditemukan'], 404);
+        }
+
+        $role = strtolower($admin->role ?? '');
+        $isSuperAdmin = in_array($role, ['superadmin', 'super_admin']);
+
+        if (!$isSuperAdmin && $complaint->properti && $complaint->properti->pemilik_id !== $admin->id) {
+            return response()->json([
+                'message' => 'Forbidden. Anda tidak memiliki akses untuk menanggapi komplain di properti ini!'
+            ], 403);
         }
 
         $complaint->update([

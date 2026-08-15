@@ -3,19 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import API from '../api';
 import SidebarUser from '../components/SidebarUser';
 import HeroBanner from '../components/HeroBanner';
+import Footer from '../components/footer';
+
 import SEOInfoSection from '../components/SEOInfoSection';
-import TestimonialSection from '../components/TestimoniSection'; // atau sesuai path file kamu
+import TestimonialSection from '../components/TestimoniSection';
 
 // HELPER FORMAT HARGA ANTI-CRASH & ANTI-NOL TAMBAHAN
 const formatPrice = (val) => {
   if (!val && val !== 0) return 'Rp 0';
 
-  // Jika sudah string berformat "Rp xxx"
   if (typeof val === 'string' && val.trim().startsWith('Rp')) return val.trim();
 
   let cleanStr = String(val).trim();
 
-  
   if (cleanStr.includes('.') || cleanStr.includes(',')) {
     cleanStr = cleanStr.split('.')[0].split(',')[0];
   }
@@ -30,7 +30,7 @@ const formatPrice = (val) => {
     : `Rp ${num.toLocaleString('id-ID')}`;
 };
 
-// Helper Format URL Gambar (Mendukung field main_image dari backend)
+// Helper Format URL Gambar
 const formatImage = (item) => {
   const rawImage = item?.main_image || item?.foto || item?.gambar || item?.image || item?.image_url;
   if (!rawImage) return '/KOST ANDARA VISTA.png';
@@ -53,66 +53,101 @@ export default function Home() {
   // State Filter, Search, Wishlist, Modal
   const [selectedCategory, setSelectedCategory] = useState('Semua');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // 🌟 FAVORITES DISIMPAN SEBAGAI SET/ARRAY ID DARI BACKEND
   const [favorites, setFavorites] = useState([]);
+  const [loadingFavId, setLoadingFavId] = useState(null); // Feedback visual saat diklik
   const [selectedRoom, setSelectedRoom] = useState(null);
 
   useEffect(() => {
-    const fetchProperti = async () => {
+    const fetchData = async () => {
       try {
         console.log("🛠️ Memulai Fetching ke Backend...");
-        const res = await API.get('/properties');
-        console.log("📦 Response Mentah Backend:", res.data);
-
-        // Ekstraksi array data dari response
-        const apiData = res.data?.data || res.data?.properties || (Array.isArray(res.data) ? res.data : []);
         
-        if (apiData.length === 0) {
-          console.warn("⚠️ Data backend kosong, menggunakan fallback data dummy.");
-          setRooms(getFallbackRooms());
-          return;
+        // 1. Fetch Properti & Fetch Wishlist User secara bersamaan
+        const [resProperties, resWishlist] = await Promise.allSettled([
+          API.get('/properties'),
+          API.get('/wishlist')
+        ]);
+
+        // Handing Data Wishlist dari Backend
+        if (resWishlist.status === 'fulfilled' && resWishlist.value?.data?.data) {
+          const userWishlists = resWishlist.value.data.data;
+          // Ambil daftar properti_id yang disukai user
+          const favIds = userWishlists.map(w => Number(w.properti_id));
+          setFavorites(favIds);
         }
 
-        // Penyesuaian struktur field sesuai response Laravel:
-        // title, price_per_month, address, gender_type, type, facilities, main_image
-        const formattedRooms = apiData.map((item, idx) => ({
-          id: item?.id || idx + 1,
-          name: item?.title || item?.nama_properti || item?.nama || item?.name || 'Hunian Tanpa Nama',
-          category: item?.type || item?.kategori || item?.category || 'Kost',
-          gender: item?.gender_type || item?.gender || item?.tipe_sewa || 'Campur',
-          price: formatPrice(item?.price_per_month ?? item?.harga ?? item?.price),
-          period: item?.periode || item?.period || 'bulan',
-          location: item?.address || item?.alamat || item?.lokasi || 'Lokasi tidak tersedia',
-          image: formatImage(item),
-          rating: item?.rating || '4.8',
-          badge: item?.badge || item?.status || 'Terpopuler',
-          desc: item?.facilities || item?.deskripsi || item?.desc || 'Tidak ada deskripsi tersedia.'
-        }));
+        // Handling Data Properti
+        if (resProperties.status === 'fulfilled') {
+          const res = resProperties.value;
+          const apiData = res.data?.data || res.data?.properties || (Array.isArray(res.data) ? res.data : []);
+          
+          if (apiData.length === 0) {
+            console.warn("⚠️ Data backend kosong.");
+            setRooms([]);
+            return;
+          }
 
-        setRooms(formattedRooms);
+          const formattedRooms = apiData.map((item, idx) => ({
+            id: Number(item?.id) || idx + 1,
+            name: item?.title || item?.nama_properti || item?.nama || item?.name || 'Hunian Tanpa Nama',
+            category: item?.type || item?.kategori || item?.category || 'Kost',
+            gender: item?.gender_type || item?.gender || item?.tipe_sewa || 'Campur',
+            price: formatPrice(item?.price_per_month ?? item?.harga ?? item?.price),
+            period: item?.periode || item?.period || 'bulan',
+            location: item?.address || item?.alamat || item?.lokasi || 'Lokasi tidak tersedia',
+            image: formatImage(item),
+            rating: item?.rating || '4.8',
+            badge: item?.badge || item?.status || 'Terpopuler',
+            desc: item?.facilities || item?.deskripsi || item?.desc || 'Tidak ada deskripsi tersedia.'
+          }));
+
+          setRooms(formattedRooms);
+        }
       } catch (error) {
-        console.error('❌ Gagal memuat data dari API, pindah ke Fallback:', error);
-        setRooms(getFallbackRooms());
+        console.error('❌ Gagal memuat data dari API:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProperti();
+    fetchData();
   }, []);
 
-  // Toggle Bookmark
-  const toggleFavorite = (id) => {
-    if (favorites.includes(id)) {
-      setFavorites(favorites.filter(favId => favId !== id));
-    } else {
-      setFavorites([...favorites, id]);
+  // 🌟 TOGGLE WISHLIST REAL-TIME DENGAN API BACKEND
+  const toggleFavorite = async (e, propertiId) => {
+    e.stopPropagation(); // Biar gak kebuka halaman detail saat tombol diklik
+    
+    // Tampilkan animasi/indikator loading mini di tombol
+    setLoadingFavId(propertiId);
+
+    try {
+      // Panggil API Toggle yang sudah dibuat di backend Laravel
+      const res = await API.post('/wishlist/toggle', { properti_id: propertiId });
+      const { is_wishlist } = res.data;
+
+      if (is_wishlist) {
+        setFavorites(prev => [...prev, propertiId]);
+      } else {
+        setFavorites(prev => prev.filter(id => id !== propertiId));
+      }
+    } catch (error) {
+      console.error('Gagal memperbarui wishlist:', error);
+      if (error.response?.status === 401) {
+        alert('Silakan login terlebih dahulu untuk menyimpan ke favorit!');
+      } else {
+        alert('Gagal memperbarui wishlist. Coba beberapa saat lagi.');
+      }
+    } finally {
+      setLoadingFavId(null);
     }
   };
 
-    // Navigasi Langsung ke Halaman Detail Properti
-    const handleGoToDetail = (room) => {
-      navigate(`/kamar/${room.id}`, { state: { room } });
-    };
+  // Navigasi Langsung ke Halaman Detail Properti
+  const handleGoToDetail = (room) => {
+    navigate(`/kamar/${room.id}`, { state: { room } });
+  };
 
   // Navigasi Langsung ke Pembayaran
   const handleBooking = (room) => {
@@ -171,19 +206,19 @@ export default function Home() {
           <div className="bg-gradient-to-r from-[#FAF5EF] via-white to-[#FAF5EF] rounded-2xl border border-[#D7C4B0]/60 p-6 md:p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative">
             <div className="space-y-3 max-w-xl z-10">
               <h3 className="text-xl md:text-2xl font-extrabold text-[#261C19]">
-                Daftarkan Properti Anda di Kafana Vista
+                Ada Keluhan?
               </h3>
               <p className="text-xs text-gray-600 leading-relaxed">
                 Berbagai fitur dan layanan manajemen sewa terpadu untuk meningkatkan okupansi bisnis kost &amp; kontrakan Anda.
               </p>
-           <a
-  href="https://wa.me/6283808699130?text=Halo%20Admin%20Kafana%20Vista,%20saya%20butuh%20bantuan"
-  target="_blank"
-  rel="noreferrer"
-  className="w-fit justify-center bg-[#B38E5D] hover:bg-[#8F6E45] text-white px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider transition shadow-lg flex items-center gap-2 whitespace-nowrap cursor-pointer"
->
-  <span>💬 Chat Customer Service</span>
-</a>
+              <a
+                href="https://wa.me/6283808699130?text=Halo%20Admin%20Kafana%20Vista,%20saya%20butuh%20bantuan"
+                target="_blank"
+                rel="noreferrer"
+                className="w-fit justify-center bg-[#B38E5D] hover:bg-[#8F6E45] text-white px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider transition shadow-lg flex items-center gap-2 whitespace-nowrap cursor-pointer"
+              >
+                <span>💬 Chat Customer Service</span>
+              </a>
             </div>
             
             <div className="w-full md:w-64 h-36 rounded-xl overflow-hidden shadow-md flex-shrink-0">
@@ -310,6 +345,8 @@ export default function Home() {
             ) : filteredRooms.length > 0 ? (
               filteredRooms.map((room) => {
                 const isFav = favorites.includes(room.id);
+                const isBtnLoading = loadingFavId === room.id;
+
                 return (
                   <div 
                     key={room.id} 
@@ -327,14 +364,22 @@ export default function Home() {
                         {room.category} • {room.gender}
                       </span>
 
+                      {/* 🌟 TOMBOL FAVORIT TERHUBUNG KELAS BACKEND API */}
                       <button
-                        onClick={() => toggleFavorite(room.id)}
-                        className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all cursor-pointer ${
-                          isFav ? 'bg-rose-500 text-white' : 'bg-white/80 text-gray-600 hover:text-rose-500'
+                        onClick={(e) => toggleFavorite(e, room.id)}
+                        disabled={isBtnLoading}
+                        className={`absolute top-3 right-3 p-2.5 rounded-full backdrop-blur-md transition-all duration-300 shadow-md cursor-pointer ${
+                          isFav 
+                            ? 'bg-rose-500 text-white scale-105' 
+                            : 'bg-white/80 text-gray-500 hover:text-rose-500 hover:bg-white'
                         }`}
-                        title="Simpan ke favorit"
+                        title={isFav ? "Hapus dari wishlist" : "Simpan ke wishlist"}
                       >
-                        ♥
+                        {isBtnLoading ? (
+                          <span className="animate-spin text-xs block">⏳</span>
+                        ) : (
+                          <span className="text-sm leading-none">{isFav ? '❤️' : '🤍'}</span>
+                        )}
                       </button>
 
                       <span className="absolute bottom-3 left-3 text-[10px] font-bold uppercase tracking-wider bg-[#B38E5D] text-white px-2.5 py-0.5 rounded-full shadow">
@@ -454,8 +499,8 @@ export default function Home() {
           </div>
         </section>
 
-       {/* 3. SECTION TESTIMONI PENGGUNA */}
-      <TestimonialSection />
+        {/* TESTIMONI */}
+        <TestimonialSection />
 
         {/* MODAL DETAIL */}
         {selectedRoom && (
@@ -526,21 +571,13 @@ export default function Home() {
 
         <SEOInfoSection />
 
-        {/* FOOTER */}
-        <footer className="bg-[#261C19] text-[#FAF5EF]/70 rounded-2xl p-8 border border-[#B38E5D]/20 mt-12">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6 text-xs font-sans tracking-widest uppercase">
-            <div className="text-xl font-bold text-[#FAF5EF] tracking-wider font-serif">
-              Kafana<span className="text-[#B38E5D] font-light">Vista</span>
-            </div>
-            <p className="text-center font-light text-[10px]">© 2026 Kafana Vista Proyek Team. All rights reserved.</p>
-            <div className="flex space-x-6 text-[#FAF5EF]/80 text-[10px]">
-              <a href="#" className="hover:text-[#B38E5D] transition">Privacy Policy</a>
-              <a href="#" className="hover:text-[#B38E5D] transition">Terms &amp; Conditions</a>
-            </div>
-          </div>
-        </footer>
 
       </div>
+      <Footer />
+
     </SidebarUser>
+    
+
+    
   );
 }

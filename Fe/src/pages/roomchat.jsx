@@ -1,33 +1,47 @@
 import React, { useState, useEffect, useRef } from 'react';
-import API from '../api'; // Sesuaikan path axios instance kamu
+import Swal from 'sweetalert2';
+import API from '../api';
 import SidebarUser from '../components/SidebarUser';
 
 function ChatRoom() {
-  // Mode Active Tab: 'group' atau 'direct'
-  const [activeTab, setActiveTab] = useState('group');
+  // Mode Tab Kiri: 'all', 'group', 'direct'
+  const [filterTab, setFilterTab] = useState('all');
 
-  // Parameter ID
-  const [propertiId, setPropertiId] = useState(''); // Akan diisi otomatis dari backend
-  const [receiverId, setReceiverId] = useState(''); // ID User Target untuk DM
+  // Mode Active Chat
+  const [activeChatType, setActiveChatType] = useState('group'); // 'group' atau 'direct'
+  const [activeProperties, setActiveProperties] = useState([]); // 🆕 Array menyimpan semua properti aktif
+  const [propertiId, setPropertiId] = useState('');
+  const [propertiData, setPropertiData] = useState(null);
+  const [receiverId, setReceiverId] = useState('');
   const [noActiveProperty, setNoActiveProperty] = useState(false);
 
-  // State Data
+  // Data Chat & User
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
-  
-  // State UI & Interaksi
+
+  // State UI
   const [loading, setLoading] = useState(false);
   const [accessDeniedErr, setAccessDeniedErr] = useState('');
-  const [selectedProfile, setSelectedProfile] = useState(null); // State untuk Pop-up Profil
+  const [selectedProfile, setSelectedProfile] = useState(null);
+
   const messagesEndRef = useRef(null);
 
- // 1. Fetch User Data & Auto-Detect Properti Aktif
+  // Custom Toast Config SweetAlert
+  const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 2500,
+    timerProgressBar: true,
+  });
+
+  // 1. Fetch User Profile & Auto-Detect Properti Aktif (Mendukung Jamak)
   useEffect(() => {
     const fetchInitialData = async () => {
-      // A. Ambil Data User (Ganti /user menjadi /profile)
+      // Fetch User Profile
       try {
-        const resUser = await API.get('/profile'); // 👈 PERBAIKAN: Menggunakan /profile, bukan /user
+        const resUser = await API.get('/profile');
         const userData = resUser.data.data || resUser.data;
         if (userData) {
           setCurrentUser(userData);
@@ -36,35 +50,40 @@ function ChatRoom() {
         console.error('Gagal mengambil data profil user:', err);
       }
 
-      // B. Ambil Otomatis ID Properti Aktif
+      // Fetch Otomatis Properti-Properti Aktif
       try {
-        const resProperti = await API.get('/chat/my-active-property');
-        if (resProperti.data && resProperti.data.properti_id) {
-          setPropertiId(resProperti.data.properti_id.toString());
+        const resProperti = await API.get('/chat/my-active-properties');
+        const propertiesList = resProperti.data.data || resProperti.data || [];
+
+        if (Array.isArray(propertiesList) && propertiesList.length > 0) {
+          setActiveProperties(propertiesList);
+          // Set pilihan default ke properti pertama
+          const firstProp = propertiesList[0];
+          setPropertiId(firstProp.id.toString());
+          setPropertiData(firstProp);
           setNoActiveProperty(false);
+        } else {
+          setNoActiveProperty(true);
         }
       } catch (err) {
         console.error('Gagal mengambil properti aktif:', err);
-        // Hanya jika API my-active-property mengembalikan 404, set status ini
-        if (err.response && err.response.status === 404) {
-          setNoActiveProperty(true);
-        }
+        setNoActiveProperty(true);
       }
     };
 
     fetchInitialData();
   }, []);
 
-  // 2. Fetch Messages Sesuai Tab Aktif
+  // 2. Fetch Messages
   const fetchMessages = async () => {
     setAccessDeniedErr('');
     try {
       let endpoint = '';
-      if (activeTab === 'group') {
-        if (!propertiId) return; // Tunggu propertiId terisi
+      if (activeChatType === 'group') {
+        if (!propertiId) return;
         endpoint = `/chat/group/${propertiId}`;
       } else {
-        if (!receiverId) return; // Tunggu receiverId terisi
+        if (!receiverId) return;
         endpoint = `/chat/direct/${receiverId}`;
       }
 
@@ -88,9 +107,9 @@ function ChatRoom() {
     }
   };
 
-  // 3. Polling Real-time (Refresh setiap 3 detik)
+  // 3. Polling Real-time (3 detik)
   useEffect(() => {
-    if ((activeTab === 'group' && propertiId) || (activeTab === 'direct' && receiverId)) {
+    if ((activeChatType === 'group' && propertiId) || (activeChatType === 'direct' && receiverId)) {
       setLoading(true);
       fetchMessages();
 
@@ -100,23 +119,23 @@ function ChatRoom() {
 
       return () => clearInterval(interval);
     }
-  }, [activeTab, propertiId, receiverId]);
+  }, [activeChatType, propertiId, receiverId]);
 
-  // 4. Auto scroll ke pesan terbawah
+  // 4. Auto scroll ke bawah saat ada pesan baru
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // 5. Handle Kirim Pesan
+  // 5. Handle Kirim Pesan dengan SweetAlert
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
 
     const payloadText = newMessage;
-    setNewMessage(''); // Clear input instan agar responsif
+    setNewMessage('');
 
     try {
-      if (activeTab === 'group') {
+      if (activeChatType === 'group') {
         await API.post('/chat/group', {
           properti_id: propertiId,
           message: payloadText,
@@ -130,24 +149,29 @@ function ChatRoom() {
       fetchMessages();
     } catch (error) {
       console.error('Gagal mengirim pesan:', error);
-      alert(error.response?.data?.message || 'Gagal mengirim pesan.');
+      
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Mengirim Pesan',
+        text: error.response?.data?.message || 'Terjadi kesalahan sistem saat mengirim pesan.',
+        confirmButtonColor: '#261C19',
+        customClass: {
+          popup: 'rounded-2xl',
+        }
+      });
     }
   };
 
-  // Helper Komponen: Render Foto Profil / Inisial yang Interaktif
-  const renderAvatar = (userObj, isMyMessage) => {
+  // Helper Foto Profil / Avatar
+  const renderAvatar = (userObj, isMyMessage = false, size = "w-9 h-9") => {
     const photo = userObj?.foto || userObj?.avatar || userObj?.profile_photo_url;
-    const name = userObj?.name || 'User';
+    const name = userObj?.name || userObj?.nama || 'User';
     const initial = name.charAt(0).toUpperCase();
 
-    // Fungsi klik profil
-    const handleAvatarClick = () => {
-      setSelectedProfile(userObj);
+    const handleAvatarClick = (e) => {
+      e.stopPropagation();
+      if (userObj) setSelectedProfile(userObj);
     };
-
-    const wrapperClass = `w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0 cursor-pointer transition-transform transform hover:scale-110 ${
-      isMyMessage ? 'bg-[#261C19] border-2 border-[#B38E5D]' : 'bg-[#B38E5D] border-2 border-white'
-    }`;
 
     if (photo) {
       const src = photo.startsWith('http') ? photo : `http://localhost:8000/storage/${photo}`;
@@ -156,7 +180,7 @@ function ChatRoom() {
           src={src}
           alt={name}
           onClick={handleAvatarClick}
-          className={`${wrapperClass} object-cover`}
+          className={`${size} rounded-full object-cover border border-[#B38E5D]/40 shadow-sm cursor-pointer hover:opacity-90 transition flex-shrink-0`}
           onError={(e) => {
             e.target.onerror = null;
             e.target.style.display = 'none';
@@ -166,7 +190,12 @@ function ChatRoom() {
     }
 
     return (
-      <div onClick={handleAvatarClick} className={`${wrapperClass} text-white`}>
+      <div
+        onClick={handleAvatarClick}
+        className={`${size} rounded-full flex items-center justify-center font-bold text-xs shadow-sm flex-shrink-0 cursor-pointer transition ${
+          isMyMessage ? 'bg-[#261C19] text-[#B38E5D]' : 'bg-[#B38E5D] text-white'
+        }`}
+      >
         {initial}
       </div>
     );
@@ -174,221 +203,352 @@ function ChatRoom() {
 
   return (
     <SidebarUser>
-      <div className="flex justify-center items-center min-h-screen bg-[#FAF5EF] p-4 font-sans text-[#261C19] relative">
-        <div className="flex flex-col w-full max-w-4xl h-[700px] bg-white rounded-2xl shadow-xl border border-[#D7C4B0] overflow-hidden">
+      <div className="min-h-screen bg-[#FAF5EF] p-2 md:p-6 flex items-center justify-center font-sans">
+        
+        {/* CONTAINER UTAMA (SPLIT SCREEN WA/IG STYLE) */}
+        <div className="w-full max-w-6xl h-[calc(100vh-5rem)] min-h-[580px] bg-white rounded-2xl shadow-2xl border border-[#D7C4B0]/60 overflow-hidden flex flex-col md:flex-row">
           
-          {/* HEADER ROOM CHAT */}
-          <div className="bg-gradient-to-r from-[#261C19] to-[#3A2A25] text-[#FAF5EF] px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between shadow-md z-10 gap-4">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 rounded-full bg-[#B38E5D] text-white flex items-center justify-center font-bold text-xl shadow-lg ring-2 ring-[#D7C4B0]/30">
-                {activeTab === 'group' ? '🏢' : '💬'}
-              </div>
-              <div>
-                <h3 className="font-bold text-lg tracking-wide">
-                  {activeTab === 'group' ? 'Grup Penghuni Kost' : 'Pesan Langsung'}
-                </h3>
-                <p className="text-xs text-[#FAF5EF]/70 flex items-center gap-1 mt-0.5">
-                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-                  {activeTab === 'group' ? 'Ruang Diskusi Terbuka' : 'Obrolan Personal Tertutup'}
-                </p>
+          {/* 👈 KIRI: SIDEBAR DAFTAR CHAT */}
+          <div className="w-full md:w-80 lg:w-96 bg-[#FAF5EF]/50 border-r border-[#D7C4B0]/60 flex flex-col h-1/3 md:h-full flex-shrink-0">
+            
+            {/* Header Sidebar Kiri */}
+            <div className="p-4 bg-[#261C19] text-white flex justify-between items-center shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="text-xl">💬</div>
+                <div>
+                  <h2 className="font-bold text-sm tracking-wide">Pesan &amp; Obrolan</h2>
+                  <p className="text-[10px] text-[#B38E5D]">KafanaVista Community</p>
+                </div>
               </div>
             </div>
 
-            {/* NAVIGASI TAB */}
-            <div className="flex bg-[#1f1715] p-1.5 rounded-xl border border-[#B38E5D]/30 self-start sm:self-auto shadow-inner">
+            {/* Tab Filter Navigasi */}
+            <div className="p-3 border-b border-[#D7C4B0]/40 flex gap-1 bg-white">
               <button
-                onClick={() => setActiveTab('group')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${
-                  activeTab === 'group'
-                    ? 'bg-[#B38E5D] text-white shadow-md transform scale-[1.02]'
-                    : 'text-[#FAF5EF]/60 hover:text-white hover:bg-white/10'
+                onClick={() => setFilterTab('all')}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition ${
+                  filterTab === 'all' ? 'bg-[#261C19] text-white' : 'text-gray-500 hover:bg-gray-100'
+                }`}
+              >
+                Semua
+              </button>
+              <button
+                onClick={() => setFilterTab('group')}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition ${
+                  filterTab === 'group' ? 'bg-[#261C19] text-white' : 'text-gray-500 hover:bg-gray-100'
                 }`}
               >
                 Grup Kost
               </button>
               <button
-                onClick={() => setActiveTab('direct')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${
-                  activeTab === 'direct'
-                    ? 'bg-[#B38E5D] text-white shadow-md transform scale-[1.02]'
-                    : 'text-[#FAF5EF]/60 hover:text-white hover:bg-white/10'
+                onClick={() => setFilterTab('direct')}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition ${
+                  filterTab === 'direct' ? 'bg-[#261C19] text-white' : 'text-gray-500 hover:bg-gray-100'
                 }`}
               >
-                Direct Message
+                Pribadi (DM)
               </button>
+            </div>
+
+            {/* List Conversation */}
+            <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+              
+              {/* ITEM 1: DAFTAR GRUP KOST AKTIF (LOOPING BANYAK PROPERTI) */}
+              {(filterTab === 'all' || filterTab === 'group') && (
+                <>
+                  {noActiveProperty || activeProperties.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-gray-400">
+                      Belum ada sewa aktif
+                    </div>
+                  ) : (
+                    activeProperties.map((prop) => {
+                      const isSelected = activeChatType === 'group' && propertiId === prop.id.toString();
+                      const propName = prop.nama_properti || prop.nama || prop.title || `Properti #${prop.id}`;
+
+                      return (
+                        <div
+                          key={prop.id}
+                          onClick={() => {
+                            setActiveChatType('group');
+                            setPropertiId(prop.id.toString());
+                            setPropertiData(prop);
+                          }}
+                          className={`p-3.5 flex items-center gap-3 cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-[#B38E5D]/15 border-l-4 border-[#B38E5D]'
+                              : 'hover:bg-white'
+                          }`}
+                        >
+                          <div className="w-12 h-12 rounded-full bg-[#261C19] text-[#B38E5D] flex items-center justify-center text-xl font-bold flex-shrink-0 shadow-sm">
+                            🏢
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-baseline">
+                              <h3 className="text-xs font-bold text-[#261C19] truncate">
+                                {propName}
+                              </h3>
+                              <span className="text-[9px] text-[#B38E5D] font-semibold bg-[#B38E5D]/10 px-1.5 py-0.5 rounded">
+                                OFFICIAL
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-gray-500 truncate mt-0.5">
+                              Ruang chat penghuni properti
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </>
+              )}
+
+              {/* ITEM 2: DIRECT MESSAGE (INPUT / TARGET DM) */}
+              {(filterTab === 'all' || filterTab === 'direct') && (
+                <div
+                  onClick={() => setActiveChatType('direct')}
+                  className={`p-3.5 flex flex-col gap-2 cursor-pointer transition-all ${
+                    activeChatType === 'direct'
+                      ? 'bg-[#B38E5D]/15 border-l-4 border-[#B38E5D]'
+                      : 'hover:bg-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-[#B38E5D] text-white flex items-center justify-center text-xl font-bold flex-shrink-0 shadow-sm">
+                      👤
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-xs font-bold text-[#261C19]">Pesan Langsung (DM)</h3>
+                      <p className="text-[11px] text-gray-500 truncate mt-0.5">
+                        {receiverId ? `Obrolan dengan User ID: #${receiverId}` : 'Klik untuk memilih/ketik ID User'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Input Cepat ID User DM */}
+                  {activeChatType === 'direct' && (
+                    <div className="mt-2 pt-2 border-t border-[#D7C4B0]/40 flex items-center gap-2">
+                      <span className="text-[10px] text-gray-500 font-bold uppercase">ID Target:</span>
+                      <input
+                        type="number"
+                        placeholder="Ketik ID User..."
+                        value={receiverId}
+                        onChange={(e) => setReceiverId(e.target.value)}
+                        className="flex-1 px-2.5 py-1 text-xs bg-white border border-[#D7C4B0] rounded-md outline-none focus:border-[#B38E5D]"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
           </div>
 
-          {/* STATUS BAR INFOMASI */}
-          <div className="bg-[#FAF5EF]/80 px-6 py-3 border-b border-[#D7C4B0] flex items-center gap-3 text-xs backdrop-blur-sm">
-            {activeTab === 'group' ? (
-              <div className="font-medium text-gray-700 flex items-center gap-2">
-                {noActiveProperty ? (
-                  <span className="text-red-600 bg-red-100 px-3 py-1 rounded-full font-semibold border border-red-200">
-                    ⚠️ Anda belum memiliki sewa kost aktif.
-                  </span>
-                ) : (
-                  <span className="text-[#B38E5D] bg-orange-50 px-3 py-1 rounded-full font-semibold border border-[#D7C4B0]">
-                    ✅ Terhubung di Ruang Properti ID: {propertiId || 'Memuat...'}
-                  </span>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 w-full max-w-sm">
-                <span className="font-semibold text-gray-700 whitespace-nowrap">Chat dengan User ID:</span>
-                <input
-                  type="number"
-                  min="1"
-                  placeholder="Ketik ID User..."
-                  value={receiverId}
-                  onChange={(e) => setReceiverId(e.target.value)}
-                  className="w-full px-3 py-1.5 border border-[#D7C4B0] rounded-md bg-white text-sm font-semibold focus:outline-none focus:border-[#B38E5D] focus:ring-2 focus:ring-[#B38E5D]/20 transition-all"
-                />
-              </div>
-            )}
-          </div>
-
-          {/* MESSAGES CONTAINER */}
-          <div className="flex-1 p-6 overflow-y-auto space-y-6 bg-cover bg-center" style={{ backgroundImage: "url('https://www.transparenttextures.com/patterns/cream-paper.png')" }}>
-            {accessDeniedErr ? (
-              <div className="flex flex-col items-center justify-center h-full text-center space-y-4 p-6">
-                <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center font-bold text-3xl shadow-sm border border-red-100">
-                  🔒
+          {/* 👉 KANAN: CHAT WINDOW UTAMA */}
+          <div className="flex-1 flex flex-col h-2/3 md:h-full bg-[#FAF5EF]/30">
+            
+            {/* HEADER CHAT AKTIF */}
+            <div className="bg-white px-6 py-3 border-b border-[#D7C4B0]/60 flex items-center justify-between shadow-sm z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#261C19] text-[#B38E5D] flex items-center justify-center text-lg font-bold shadow-sm">
+                  {activeChatType === 'group' ? '🏢' : '👤'}
                 </div>
                 <div>
-                  <h4 className="font-bold text-red-700 text-lg">Akses Dibatasi</h4>
-                  <p className="text-sm text-gray-600 max-w-md mt-2">
-                    {accessDeniedErr}
+                  <h3 className="font-bold text-sm text-[#261C19]">
+                    {activeChatType === 'group'
+                      ? (propertiData?.nama_properti || propertiData?.nama || `Grup Penghuni Kost ID: ${propertiId || '-'}`)
+                      : (receiverId ? `Direct Message - User #${receiverId}` : 'Direct Message')}
+                  </h3>
+                  <p className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    {activeChatType === 'group' ? 'Ruang Diskusi Penghuni' : 'Private Conversation'}
                   </p>
                 </div>
               </div>
-            ) : loading && messages.length === 0 ? (
-              <div className="flex justify-center items-center h-full">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#B38E5D]"></div>
+
+              {/* Status Badge */}
+              <div className="text-right hidden sm:block">
+                <span className="text-[10px] bg-[#FAF5EF] text-[#261C19] px-3 py-1 rounded-full font-bold border border-[#D7C4B0]">
+                  {activeChatType === 'group' ? `Property ID: ${propertiId || '...'}` : `User ID Target: ${receiverId || 'Belum dipilih'}`}
+                </span>
               </div>
-            ) : messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center space-y-3 opacity-60">
-                <span className="text-4xl">👋</span>
-                <p className="text-sm text-gray-500 font-medium">Belum ada obrolan. Mulai sapa semuanya!</p>
-              </div>
-            ) : (
-              messages.map((chat) => {
-                const currentUserId = currentUser?.id;
-                const isMyMessage = chat.sender_id === currentUserId || chat.user_id === currentUserId;
-                const senderUser = chat.sender || chat.user || { id: chat.sender_id, name: `User #${chat.sender_id}` };
+            </div>
 
-                return (
-                  <div key={chat.id} className={`flex items-end gap-3 ${isMyMessage ? 'flex-row-reverse' : 'flex-row'} group`}>
-                    
-                    {/* AVATAR DENGAN FITUR KLIK */}
-                    <div title="Klik untuk lihat profil">
-                      {renderAvatar(isMyMessage ? currentUser : senderUser, isMyMessage)}
-                    </div>
-
-                    {/* BUBBLE PESAN */}
-                    <div className={`flex flex-col max-w-[75%] ${isMyMessage ? 'items-end' : 'items-start'}`}>
-                      {/* Nama Pengirim */}
-                      {!isMyMessage && (
-                        <span className="text-[11px] font-bold text-gray-500 mb-1 ml-1 cursor-pointer hover:text-[#B38E5D]" onClick={() => setSelectedProfile(senderUser)}>
-                          {senderUser.name}
-                        </span>
-                      )}
-
-                      <div
-                        className={`px-4 py-3 text-[13px] leading-relaxed shadow-sm transition-all duration-200 group-hover:shadow-md ${
-                          isMyMessage
-                            ? 'bg-[#261C19] text-[#FAF5EF] rounded-2xl rounded-tr-sm'
-                            : 'bg-white text-[#261C19] border border-[#D7C4B0] rounded-2xl rounded-tl-sm'
-                        }`}
-                      >
-                        <p className="whitespace-pre-wrap">{chat.message}</p>
-                      </div>
-
-                      {/* Waktu Pesan */}
-                      <span className={`block text-[10px] mt-1 font-medium ${isMyMessage ? 'text-gray-400 pr-1' : 'text-gray-400 pl-1'}`}>
-                        {chat.created_at ? new Date(chat.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : ''}
-                      </span>
-                    </div>
+            {/* AREA MESSAGES FEED */}
+            <div 
+              className="flex-1 p-4 md:p-6 overflow-y-auto space-y-4 bg-[#FAF5EF]/40"
+              style={{ backgroundImage: "radial-gradient(#D7C4B0 0.5px, transparent 0.5px)", backgroundSize: "16px 16px" }}
+            >
+              {accessDeniedErr ? (
+                <div className="flex flex-col items-center justify-center h-full text-center space-y-3 p-6 bg-white/80 rounded-2xl border border-red-200">
+                  <div className="w-12 h-12 bg-red-100 text-red-500 rounded-full flex items-center justify-center text-2xl font-bold">
+                    🔒
                   </div>
-                );
-              })
-            )}
-            <div ref={messagesEndRef} />
+                  <div>
+                    <h4 className="font-bold text-red-700 text-sm">Akses Dibatasi</h4>
+                    <p className="text-xs text-gray-500 mt-1 max-w-xs">{accessDeniedErr}</p>
+                  </div>
+                </div>
+              ) : loading && messages.length === 0 ? (
+                <div className="flex justify-center items-center h-full">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#B38E5D]"></div>
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center space-y-2 opacity-60">
+                  <span className="text-4xl">💬</span>
+                  <p className="text-xs text-gray-500 font-medium">Belum ada obrolan. Mulai menyapa sekarang!</p>
+                </div>
+              ) : (
+                messages.map((chat) => {
+                  const currentUserId = currentUser?.id;
+                  const isMyMessage = chat.sender_id === currentUserId || chat.user_id === currentUserId;
+                  const senderUser = chat.sender || chat.user || { id: chat.sender_id, name: `User #${chat.sender_id}` };
+
+                  return (
+                    <div
+                      key={chat.id}
+                      className={`flex items-end gap-2 ${isMyMessage ? 'flex-row-reverse' : 'flex-row'} group`}
+                    >
+                      {/* Avatar Pengirim */}
+                      {!isMyMessage && renderAvatar(senderUser, false, "w-7 h-7")}
+
+                      {/* Bubble Pesan */}
+                      <div className={`flex flex-col max-w-[75%] ${isMyMessage ? 'items-end' : 'items-start'}`}>
+                        {/* Nama Pengirim di Group */}
+                        {!isMyMessage && activeChatType === 'group' && (
+                          <span
+                            onClick={() => setSelectedProfile(senderUser)}
+                            className="text-[10px] font-bold text-[#B38E5D] mb-0.5 ml-1 cursor-pointer hover:underline"
+                          >
+                            {senderUser.name || senderUser.nama}
+                          </span>
+                        )}
+
+                        <div
+                          className={`px-3.5 py-2.5 text-xs leading-relaxed shadow-sm relative ${
+                            isMyMessage
+                              ? 'bg-[#261C19] text-white rounded-2xl rounded-tr-none'
+                              : 'bg-white text-[#261C19] border border-[#D7C4B0]/60 rounded-2xl rounded-tl-none'
+                          }`}
+                        >
+                          <p className="whitespace-pre-wrap">{chat.message}</p>
+                          
+                          {/* Waktu Pesan */}
+                          <div
+                            className={`text-[9px] mt-1 text-right ${
+                              isMyMessage ? 'text-[#D7C4B0]' : 'text-gray-400'
+                            }`}
+                          >
+                            {chat.created_at
+                              ? new Date(chat.created_at).toLocaleTimeString('id-ID', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                              : ''}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* FORM INPUT PESAN */}
+            <div className="p-3 bg-white border-t border-[#D7C4B0]/60">
+              <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder={
+                    accessDeniedErr || (activeChatType === 'group' && noActiveProperty)
+                      ? 'Kamu tidak diizinkan mengirim pesan...'
+                      : activeChatType === 'direct' && !receiverId
+                      ? 'Pilih/Ketik ID User tujuan lebih dulu...'
+                      : 'Ketik pesan...'
+                  }
+                  disabled={
+                    !!accessDeniedErr ||
+                    (activeChatType === 'group' && noActiveProperty) ||
+                    (activeChatType === 'direct' && !receiverId)
+                  }
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  className="flex-1 px-4 py-3 bg-[#FAF5EF] border border-[#D7C4B0]/80 rounded-full text-xs outline-none focus:bg-white focus:border-[#B38E5D] disabled:bg-gray-100 disabled:cursor-not-allowed transition"
+                />
+                
+                <button
+                  type="submit"
+                  disabled={
+                    !!accessDeniedErr ||
+                    !newMessage.trim() ||
+                    (activeChatType === 'group' && noActiveProperty) ||
+                    (activeChatType === 'direct' && !receiverId)
+                  }
+                  className="w-10 h-10 bg-[#B38E5D] hover:bg-[#8F6E45] text-white rounded-full flex items-center justify-center transition shadow-md disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0 cursor-pointer"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 transform rotate-45 -mt-0.5 -ml-0.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                  </svg>
+                </button>
+              </form>
+            </div>
+
           </div>
 
-          {/* INPUT FORM CHAT */}
-          <div className="p-4 bg-white border-t border-[#D7C4B0] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-            <form onSubmit={handleSendMessage} className="flex items-center gap-3">
-              <input
-                type="text"
-                placeholder={
-                  accessDeniedErr || (activeTab === 'group' && noActiveProperty)
-                    ? 'Anda tidak diizinkan mengirim pesan...'
-                    : 'Tulis pesan Anda di sini...'
-                }
-                disabled={!!accessDeniedErr || (activeTab === 'group' && noActiveProperty)}
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                className="flex-1 px-5 py-3.5 bg-[#FAF5EF] border border-[#D7C4B0] rounded-xl text-sm outline-none focus:bg-white focus:border-[#B38E5D] focus:ring-2 focus:ring-[#B38E5D]/20 disabled:bg-gray-100 disabled:cursor-not-allowed transition-all placeholder-gray-400"
-              />
-              <button
-                type="submit"
-                disabled={!!accessDeniedErr || !newMessage.trim() || (activeTab === 'group' && noActiveProperty)}
-                className="bg-[#B38E5D] hover:bg-[#8F6E45] text-white px-6 py-3.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-95 flex items-center gap-2"
-              >
-                <span>Kirim</span>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 transform rotate-45 -mt-1" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                </svg>
-              </button>
-            </form>
-          </div>
         </div>
 
-        {/* MODAL PROFIL (POP-UP) */}
+        {/* MODAL PROFIL USER */}
         {selectedProfile && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setSelectedProfile(null)}>
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => setSelectedProfile(null)}
+          >
             <div 
-              className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-[#D7C4B0] flex flex-col items-center relative"
-              onClick={(e) => e.stopPropagation()} // Prevent close when clicking inside modal
+              className="bg-white rounded-2xl p-6 w-full max-w-xs shadow-2xl border border-[#D7C4B0] flex flex-col items-center relative"
+              onClick={(e) => e.stopPropagation()}
             >
               <button 
                 onClick={() => setSelectedProfile(null)}
-                className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition"
+                className="absolute top-3 right-3 text-gray-400 hover:text-red-500 text-sm"
               >
-                ✖
+                ✕
               </button>
-              
-              <div className="w-24 h-24 rounded-full border-4 border-[#FAF5EF] shadow-md bg-[#B38E5D] flex items-center justify-center mb-4 overflow-hidden">
+
+              <div className="w-20 h-20 rounded-full bg-[#B38E5D] text-white flex items-center justify-center font-bold text-2xl mb-3 shadow-md overflow-hidden">
                 {selectedProfile.foto || selectedProfile.profile_photo_url ? (
                   <img 
                     src={(selectedProfile.foto || selectedProfile.profile_photo_url).startsWith('http') ? (selectedProfile.foto || selectedProfile.profile_photo_url) : `http://localhost:8000/storage/${selectedProfile.foto || selectedProfile.profile_photo_url}`} 
-                    alt={selectedProfile.name} 
+                    alt="User" 
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <span className="text-3xl font-bold text-white">{selectedProfile.name?.charAt(0).toUpperCase()}</span>
+                  (selectedProfile.name || selectedProfile.nama || 'U').charAt(0).toUpperCase()
                 )}
               </div>
-              
-              <h2 className="text-xl font-bold text-[#261C19]">{selectedProfile.name || 'Pengguna Tanpa Nama'}</h2>
-              <p className="text-sm text-gray-500 mt-1">Sistem ID: #{selectedProfile.id}</p>
-              
-              <div className="mt-6 w-full flex gap-3">
-                <button 
-                  onClick={() => {
-                    setReceiverId(selectedProfile.id.toString());
-                    setActiveTab('direct');
-                    setSelectedProfile(null);
-                  }}
-                  className="flex-1 bg-[#261C19] hover:bg-[#1f1715] text-white py-2.5 rounded-lg text-sm font-semibold transition shadow"
-                >
-                  Kirim Pesan (DM)
-                </button>
-              </div>
+
+              <h3 className="font-bold text-sm text-[#261C19]">{selectedProfile.name || selectedProfile.nama || 'User'}</h3>
+              <p className="text-[11px] text-gray-500 mt-0.5">ID Pengguna: #{selectedProfile.id}</p>
+
+              <button
+                onClick={() => {
+                  const targetName = selectedProfile.name || selectedProfile.nama || `User #${selectedProfile.id}`;
+                  setReceiverId(selectedProfile.id.toString());
+                  setActiveChatType('direct');
+                  setSelectedProfile(null);
+
+                  Toast.fire({
+                    icon: 'success',
+                    title: `Membuka percakapan dengan ${targetName}`
+                  });
+                }}
+                className="mt-4 w-full bg-[#261C19] hover:bg-[#1f1715] text-white py-2 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
+              >
+                💬 Kirim Pesan Langsung (DM)
+              </button>
             </div>
           </div>
         )}
+
       </div>
     </SidebarUser>
   );

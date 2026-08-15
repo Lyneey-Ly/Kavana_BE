@@ -5,9 +5,13 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Pemesanan;
 use App\Models\Properti;
-use App\Models\Kamar; // 👈 1. Import Model Kamar
+use App\Models\Kamar;
+use App\Models\DokumenSewa;
 use App\Models\RiwayatStatusPemesanan;
+use App\Models\FinanceTracker;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB; // 👈 Import DB Facade
 use Carbon\Carbon;
 
 class PemesananController extends Controller
@@ -19,14 +23,18 @@ class PemesananController extends Controller
     {
         $user = Auth::guard('sanctum')->user();
 
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
         $request->validate([
             'properti_id'     => 'required|exists:propertis,id',
-            'kamar_id'        => 'required|exists:kamars,id', // 👈 2. Validasi kamar_id
+            'kamar_id'        => 'required|exists:kamars,id',
             'check_in_date'   => 'required|date|after_or_equal:today',
             'duration_months' => 'required|integer|min:1',
         ]);
 
-        // Cek ketersediaan kamar
+        // 1. Cek keberadaan kamar
         $kamar = Kamar::where('id', $request->kamar_id)
                       ->where('properti_id', $request->properti_id)
                       ->first();
@@ -37,84 +45,168 @@ class PemesananController extends Controller
             ], 404);
         }
 
-        if ($kamar->status !== 'kosong') {
+        // 2. ⚡ CEK APAKAH KAMAR SEDANG DALAM PROSES BOOKING/TERISI (Mencegah Double Rent)
+        $isPendingOrActive = Pemesanan::where('kamar_id', $request->kamar_id)
+            ->whereIn('status', ['Tertunda', 'Diverifikasi', 'Dikonfirmasi'])
+            ->exists();
+
+        if ($isPendingOrActive || !in_array(strtolower($kamar->status), ['kosong', 'tersedia'])) {
             return response()->json([
-                'message' => 'Maaf, unit kamar ini sudah terisi atau tidak tersedia!'
+                'message' => 'Maaf, unit kamar ini sedang dalam proses pemesanan atau sudah terisi!'
             ], 400);
         }
 
         $properti = Properti::findOrFail($request->properti_id);
         $totalPrice = $properti->price_per_month * $request->duration_months;
 
-        $pemesanan = Pemesanan::create([
-            'customer_id'     => $user->id,
-            'properti_id'     => $request->properti_id,
-            'kamar_id'        => $request->kamar_id, // 👈 Simpan kamar_id
-            'booking_date'    => Carbon::now(),
-            'check_in_date'   => $request->check_in_date,
-            'duration_months' => $request->duration_months,
-            'total_price'     => $totalPrice,
-            'status'          => 'Tertunda', 
-            'expired_at'      => Carbon::now()->addHour(), // Batas waktu pembayaran 1 jam
-        ]);
+        DB::beginTransaction();
+        try {
+            $pemesanan = Pemesanan::create([
+                'customer_id'     => $user->id,
+                'properti_id'     => $request->properti_id,
+                'kamar_id'        => $request->kamar_id,
+                'booking_date'    => Carbon::now(),
+                'check_in_date'   => $request->check_in_date,
+                'duration_months' => $request->duration_months,
+                'total_price'     => $totalPrice,
+                'status'          => 'Tertunda', 
+                'expired_at'      => Carbon::now()->addHour(),
+            ]);
 
-        return response()->json([
-            'message' => 'Booking berhasil diajukan! Silakan lakukan pembayaran dalam waktu 1 jam.',
-            'data'    => $pemesanan
-        ], 201);
+            // ⚡ OTOMATIS GENERATE DOKUMEN SEWA SAAT BOOKING DIBUAT
+            $startDate = Carbon::parse($request->check_in_date);
+            $endDate = $startDate->copy()->addMonths((int)$request->duration_months);
+
+            $leaseAgreementText = "SURAT PERJANJIAN SEWA HUNIAN KAFANA VISTA\n\n"
+                . "Pada hari ini, disepakati perjanjian sewa antara Management Kafana Vista dengan " . ($user->name ?? 'Penyewa') . ".\n\n"
+                . "Rincian Sewa:\n"
+                . "- Properti: " . $properti->title . "\n"
+                . "- Nomor Kamar: " . $kamar->nomor_kamar . "\n"
+                . "- Tanggal Check-in: " . $startDate->format('d-m-Y') . "\n"
+                . "- Tanggal Selesai: " . $endDate->format('d-m-Y') . "\n"
+                . "- Durasi: " . $request->duration_months . " Bulan\n"
+                . "- Total Biaya: Rp " . number_format($totalPrice, 0, ',', '.') . "\n\n"
+                . "Dengan melakukan pembayaran, Penyewa menyatakan setuju dengan seluruh syarat dan ketentuan yang berlaku.";
+
+            DokumenSewa::create([
+                'pemesanan_id'    => $pemesanan->id,
+                'start_date'      => $startDate->format('Y-m-d'),
+                'end_date'        => $endDate->format('Y-m-d'),
+                'lease_agreement' => $leaseAgreementText,
+                'status'          => 'Draft',
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Booking berhasil diajukan! Dokumen sewa otomatis diterbitkan. Silakan lakukan pembayaran dalam waktu 1 jam.',
+                'data'    => $pemesanan->load('dokumenSewa')
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal membuat booking',
+                'error'   => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
-     * ADMIN: Memperbarui Status Pemesanan & Mengubah Status Unit Kamar Spesifik
+     * 🔒 ADMIN: Memperbarui Status Pemesanan & Unit Kamar (Akses Terkunci per Pemilik)
      */
     public function updateStatus(Request $request, $id)
     {
         $admin = Auth::guard('sanctum')->user();
 
+        if (!$admin) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
         $request->validate([
             'status' => 'required|in:Tertunda,Diverifikasi,Dikonfirmasi,Ditolak,Selesai,Expired,Batal',
         ]);
 
-        $pemesanan = Pemesanan::findOrFail($id);
-        $oldStatus = $pemesanan->status;
-        $pemesanan->status = $request->status;
-        $pemesanan->save();
+        $pemesanan = Pemesanan::with(['properti', 'pembayaran'])->find($id);
 
-        // ⚡ 3. SINKRONISASI STATUS UNIT KAMAR OTOMATIS
-        if ($pemesanan->kamar_id) {
-            $kamar = Kamar::find($pemesanan->kamar_id);
-            if ($kamar) {
-                if ($request->status === 'Dikonfirmasi') {
-                    // Jika pembayaran dikonfirmasi -> Status KAMAR berubah jadi TERISI
-                    $kamar->update(['status' => 'Terisi']);
-                } elseif (in_array($request->status, ['Selesai', 'Ditolak', 'Expired', 'Batal'])) {
-                    // Jika masa sewa selesai / batal / expired -> Status KAMAR kembali TERSEDIA
-                    $kamar->update(['status' => 'Tersedia']);
-                }
-            }
+        if (!$pemesanan) {
+            return response()->json(['message' => 'Data pemesanan tidak ditemukan'], 404);
         }
 
-        // Catat ke riwayat perubahan status
-        RiwayatStatusPemesanan::create([
-            'pemesanan_id' => $pemesanan->id,
-            'new_status'   => $request->status,
-            'changed_at'   => Carbon::now(),
-            'admin_id'     => $admin ? $admin->id : null,
-        ]);
+        // 🔒 Proteksi Hak Akses
+        $role = strtolower($admin->role ?? '');
+        $isSuperAdmin = in_array($role, ['superadmin', 'super_admin']);
 
-        return response()->json([
-            'message' => 'Status pemesanan & status kamar berhasil diperbarui!',
-            'data'    => [
-                'pemesanan_id'      => $pemesanan->id,
-                'status_sebelumnya' => $oldStatus,
-                'status_baru'       => $pemesanan->status,
-            ]
-        ], 200);
+        if (!$isSuperAdmin && $pemesanan->properti && $pemesanan->properti->pemilik_id !== $admin->id) {
+            return response()->json([
+                'message' => 'Forbidden. Anda tidak memiliki akses untuk mengubah status pemesanan di properti ini!'
+            ], 403);
+        }
+
+        $oldStatus = $pemesanan->status;
+
+        DB::beginTransaction();
+        try {
+            $pemesanan->status = $request->status;
+            $pemesanan->save();
+
+            // ⚡ SINKRONISASI STATUS UNIT KAMAR OTOMATIS
+            if ($pemesanan->kamar_id) {
+                $kamar = Kamar::find($pemesanan->kamar_id);
+                if ($kamar) {
+                    if ($request->status === 'Dikonfirmasi') {
+                        $kamar->update(['status' => 'terisi']);
+                    } elseif (in_array($request->status, ['Selesai', 'Ditolak', 'Expired', 'Batal'])) {
+                        $kamar->update(['status' => 'kosong']);
+                    }
+                }
+            }
+
+            // 🚀 OTOMATIS CATAT KE FINANCE TRACKER JIKA STATUS DIKONFIRMASI
+            if ($request->status === 'Dikonfirmasi') {
+                $nominal = $pemesanan->pembayaran->amount ?? $pemesanan->total_price ?? 0;
+                $namaProperti = $pemesanan->properti->title ?? $pemesanan->properti->nama_properti ?? 'Hunian Kost';
+
+                FinanceTracker::create([
+                    'user_id'     => $pemesanan->customer_id,
+                    'type'        => 'pengeluaran',
+                    'description' => 'Pembayaran Sewa ' . $namaProperti,
+                    'amount'      => $nominal,
+                    'category'    => 'Tagihan Kost',
+                    'date'        => now()->toDateString(),
+                ]);
+            }
+
+            // Catat ke riwayat perubahan status
+            RiwayatStatusPemesanan::create([
+                'pemesanan_id' => $pemesanan->id,
+                'new_status'   => $request->status,
+                'changed_at'   => Carbon::now(),
+                'admin_id'     => $admin->id,
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Status pemesanan & status kamar berhasil diperbarui!',
+                'data'    => [
+                    'pemesanan_id'      => $pemesanan->id,
+                    'status_sebelumnya' => $oldStatus,
+                    'status_baru'       => $pemesanan->status,
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Gagal memproses perubahan status: ' . $e->getMessage());
+
+            return response()->json([
+                'message' => 'Terjadi kesalahan pada server saat mengubah status!',
+                'error'   => $e->getMessage()
+            ], 500);
+        }
     }
 
-    /**
-     * CUSTOMER: Menampilkan Riwayat Pemesanan
-     */
     /**
      * CUSTOMER: Menampilkan Riwayat Pemesanan
      */
@@ -129,15 +221,14 @@ class PemesananController extends Controller
                 ], 401);
             }
 
-            // AUTO-EXPIRED: Aman dari null user
+            // AUTO-EXPIRED: Mengubah status otomatis jika melewati batas jam
             Pemesanan::where('customer_id', $user->id)
                 ->where('status', 'Tertunda')
                 ->whereNotNull('expired_at')
                 ->where('expired_at', '<', Carbon::now())
                 ->update(['status' => 'Expired']);
 
-            // Mengambil data riwayat pemesanan dengan relasi aman
-            $riwayat = Pemesanan::with(['properti'])
+            $riwayat = Pemesanan::with(['properti', 'dokumenSewa'])
                 ->when(method_exists(Pemesanan::class, 'kamar'), function ($query) {
                     $query->with('kamar');
                 })
@@ -168,7 +259,10 @@ class PemesananController extends Controller
     {
         $user = Auth::guard('sanctum')->user();
 
-        // Cari pemesanan milik user yang aktif (Dikonfirmasi)
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
         $pemesananAktif = Pemesanan::with(['dokumenSewa', 'kamar'])
             ->where('customer_id', $user->id)
             ->where('status', 'Dikonfirmasi')
@@ -181,7 +275,6 @@ class PemesananController extends Controller
                 $endDate = Carbon::parse($sewa->dokumenSewa->end_date);
                 $hariTersisa = (int) Carbon::now()->diffInDays($endDate, false);
 
-                // Jika masa kontrak sisa 7 hari atau kurang
                 if ($hariTersisa <= 7 && $hariTersisa >= 0) {
                     $nomorKamar = $sewa->kamar ? " ({$sewa->kamar->nomor_kamar})" : "";
                     $notifikasi[] = [
@@ -198,42 +291,62 @@ class PemesananController extends Controller
         ], 200);
     }
 
- public function getActiveRental(Request $request)
-{
-    try {
-        // Gunakan Auth Sanctum agar konsisten dengan method lainnya
-        $user = Auth::guard('sanctum')->user() ?? $request->user();
+    /**
+     * CUSTOMER: Ambil Data Sewa Aktif
+     */
+    public function getActiveRental(Request $request)
+    {
+        try {
+            $user = Auth::guard('sanctum')->user() ?? $request->user();
 
-        if (!$user) {
+            if (!$user) {
+                return response()->json([
+                    'message' => 'Unauthenticated / Token tidak valid'
+                ], 401);
+            }
+
+            $rentals = Pemesanan::with(['properti', 'kamar', 'dokumenSewa'])
+                ->where('customer_id', $user->id)
+                ->whereIn('status', ['Dikonfirmasi', 'Diverifikasi'])
+                ->latest()
+                ->get();
+
+            if ($rentals->isEmpty()) {
+                return response()->json([
+                    'message' => 'Kamu belum memiliki pemesanan aktif',
+                    'data'    => []
+                ], 404);
+            }
+
             return response()->json([
-                'message' => 'Unauthenticated / Token tidak valid'
-            ], 401);
-        }
+                'data' => $rentals
+            ], 200);
 
-        // Ambil pemesanan aktif milik customer
-        $rental = Pemesanan::with(['properti', 'kamar'])
-            ->where('customer_id', $user->id) // 👈 FIX: Ganti 'user_id' jadi 'customer_id'
-            ->whereIn('status', ['Dikonfirmasi', 'Diverifikasi']) // 👈 FIX: Sesuaikan dengan status di sistemmu
-            ->latest()
-            ->first();
-
-            
-
-        if (!$rental) {
+        } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Kamu belum memiliki pemesanan aktif'
-            ], 404);
+                'message' => 'Terjadi kesalahan pada server!',
+                'error'   => $e->getMessage()
+            ], 500);
         }
-
-        return response()->json([
-            'data' => $rental
-        ], 200);
-
-    } catch (\Exception $e) {
-        return response()->json([
-            'message' => 'Terjadi kesalahan pada server!',
-            'error'   => $e->getMessage()
-        ], 500);
     }
-}
+
+    public function saveSignature(Request $request, $id)
+    {
+        $booking = Pemesanan::findOrFail($id);
+
+        $dokumen = DokumenSewa::updateOrCreate(
+            ['pemesanan_id' => $booking->id],
+            [
+                'customer_signature' => $request->signature,
+                'signed_at'          => now(),
+                'status'             => 'Disetujui',
+            ]
+        );
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Tanda tangan berhasil disimpan.',
+            'data'    => $dokumen
+        ]);
+    }
 }

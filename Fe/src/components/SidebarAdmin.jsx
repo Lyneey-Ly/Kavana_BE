@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import Swal from 'sweetalert2'; // 👈 Import SweetAlert2
+import Swal from 'sweetalert2';
+import NotificationBell from './NotificationBell'; // 👈 1. Import Komponen Notifikasi Kamu
 
 export default function SidebarAdmin({ children }) {
   const navigate = useNavigate();
@@ -10,7 +11,7 @@ export default function SidebarAdmin({ children }) {
   // Cek Status Login
   const token = sessionStorage.getItem('token');
 
-  // Handle Logout dengan SweetAlert2 Konfirmasi
+  // Handle Logout dengan SweetAlert2
   const handleLogout = () => {
     Swal.fire({
       title: 'Konfirmasi Keluar',
@@ -76,27 +77,23 @@ export default function SidebarAdmin({ children }) {
     );
   }
 
-  // 🟢 JIKA SUDAH LOGIN: Daftar Menu Admin Lengkap dengan Icon Rapi
+  // 🟢 JIKA SUDAH LOGIN: Daftar Menu Sidebar (Sudah Dihapus Menu Notip-nya)
   const menuItems = [
     { name: 'Dashboard', path: '/admindashboard', icon: '📊' },
     { name: 'Profil Admin', path: '/AdminProfile', icon: '👤' },
-
     { name: 'Kelola Properti', path: '/admin/properti', icon: '🏢' },
     { name: 'Penyewa Aktif', path: '/adminpenyewa', icon: '👥' },
     { name: 'Tagihan & Order', path: '/adminTO', icon: '🧾' },
     { name: 'Laporan Keuangan', path: '/adminlaporan', icon: '📈' },
     { name: 'Kelola Komplain', path: '/admin/komplain', icon: '⚠️' },
-
     { name: 'Dokumen Sewa', path: '/admin/dokumen-sewa', icon: '📜' },
   ];
 
   return (
     <div className="flex h-screen bg-[#FAF5EF] overflow-hidden">
       
-      {/* SIDEBAR DESKTOP (FIXED) */}
+      {/* SIDEBAR DESKTOP */}
       <aside className="hidden md:flex flex-col w-64 bg-[#261C19] text-[#FAF5EF] border-r border-[#B38E5D]/20 h-full flex-shrink-0 shadow-2xl relative z-30">
-        
-        {/* Brand Header */}
         <div className="p-6 border-b border-[#B38E5D]/20 flex flex-col items-start justify-center">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold font-serif tracking-wider text-white">
@@ -109,11 +106,9 @@ export default function SidebarAdmin({ children }) {
           <p className="text-[10px] text-[#D7C4B0]/70 uppercase tracking-widest mt-1">Management Console</p>
         </div>
 
-        {/* Navigation Menu */}
         <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
           {menuItems.map((item) => {
             const isActive = location.pathname.startsWith(item.path);
-
             return (
               <Link
                 key={item.path}
@@ -124,23 +119,18 @@ export default function SidebarAdmin({ children }) {
                     : 'text-[#FAF5EF]/70 hover:bg-white/10 hover:text-white hover:translate-x-1'
                 }`}
               >
-                {/* Indikator Garis Menyala Saat Aktif */}
                 {isActive && (
                   <span className="absolute left-0 top-2 bottom-2 w-1 bg-white rounded-r-full shadow-sm" />
                 )}
-
-                {/* Icon */}
                 <span className="text-lg transition-transform duration-300 group-hover:scale-125 group-hover:rotate-6">
                   {item.icon}
                 </span>
-                
                 <span className="truncate">{item.name}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Logout Button */}
         <div className="p-4 border-t border-[#B38E5D]/20">
           <button
             onClick={handleLogout}
@@ -182,7 +172,6 @@ export default function SidebarAdmin({ children }) {
         <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
           {menuItems.map((item) => {
             const isActive = location.pathname.startsWith(item.path);
-
             return (
               <Link
                 key={item.path}
@@ -214,23 +203,42 @@ export default function SidebarAdmin({ children }) {
       {/* CONTAINER KONTEN UTAMA */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         
-        {/* Mobile Header */}
-        <header className="md:hidden bg-[#261C19] text-white p-4 flex justify-between items-center shadow-md border-b border-[#B38E5D]/20">
-          <h1 className="font-serif font-bold text-lg">
-            Kafana<span className="text-[#B38E5D]">Vista</span>
-          </h1>
-          <button 
-            onClick={() => setIsOpen(true)} 
-            className="px-3 py-2 bg-[#B38E5D] hover:bg-[#8F6E45] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition shadow-sm flex items-center gap-1.5 cursor-pointer"
-          >
-            <span>☰</span> Menu
-          </button>
+        {/* 2. TOPBAR HEADER (Tempat Lonceng Notifikasi & Profile) */}
+        <header className="bg-[#261C19] border-b border-slate-200/80 px-4 md:px-8 py-3 flex items-center justify-between shadow-xs z-20 shrink-0">
+          
+          {/* Sisi Kiri Header */}
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsOpen(true)} 
+              className="md:hidden p-2 text-[#261C19] hover:bg-slate-100 rounded-lg transition cursor-pointer"
+            >
+              <span className="text-xl">☰</span>
+            </button>
+            <h1 className="md:hidden font-serif font-bold text-base text-[#261C19]">
+              Kafana<span className="text-[#B38E5D]">Vista</span>
+            </h1>
+            <div className="hidden md:block">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Sistem Manajemen</span>
+            </div>
+          </div>
+
+          {/* Sisi Kanan Header: Notifikasi & Profil */}
+          <div className="flex items-center gap-3 sm:gap-4">
+            
+            {/* 👈 DIPASANG DI SINI */}
+            <NotificationBell />
+
+            <div className="h-6 w-[1px] bg-[#B38E5D] hidden sm:block" />
+
+           
+          </div>
         </header>
 
         {/* Scrollable Main Area */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
           {children}
         </main>
+
       </div>
 
     </div>

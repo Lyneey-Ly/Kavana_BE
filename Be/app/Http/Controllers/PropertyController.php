@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Storage;
 class PropertyController extends Controller
 {
     /**
-     * Tampilkan data properti dengan filter pencarian dinamis & relasi pemilik
+     * Tampilkan data properti dengan filter pencarian dinamis & relasi pemilik (Public / Katalog)
      */
     public function index(Request $request)
     {
@@ -70,21 +70,56 @@ class PropertyController extends Controller
     }
 
     /**
+     * 🆕 KHUSUS DASHBOARD ADMIN: Ambil properti terfilter otomatis berdasarkan admin yang login
+     */
+    public function indexAdmin(Request $request)
+    {
+        $user = Auth::guard('sanctum')->user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Unauthenticated. Silakan login terlebih dahulu!'
+            ], 401);
+        }
+
+        $query = Properti::with('pemilik');
+
+        $role = strtolower($user->role ?? '');
+        $isSuperAdmin = in_array($role, ['superadmin', 'super_admin']);
+
+        // 🔒 Jika BUKAN Superadmin, paksa HANYA ambil properti milik admin yang login
+        if (!$isSuperAdmin) {
+            $query->where('pemilik_id', $user->id);
+        }
+
+        $properties = $query->latest()->get();
+
+        return response()->json([
+            'message' => 'Success fetch admin properties',
+            'count'   => $properties->count(),
+            'data'    => $properties
+        ], 200);
+    }
+
+    /**
      * Simpan data properti baru beserta foto utama & galeri
      */
     public function store(Request $request)
     {
         $request->validate([
-            'title'            => 'required|string|max:255',
-            'type'             => 'required|string',
-            'gender_type'      => 'required|string',
-            'price_per_month'  => 'required|numeric',
-            'address'          => 'required|string',
-            'facilities'       => 'nullable|string',
-            'status'           => 'nullable|string',
-            'main_image'       => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
-            'gallery_images'   => 'nullable|array',
-            'gallery_images.*' => 'image|mimes:jpeg,png,jpg,webp|max:2048',
+            'title'             => 'required|string|max:255',
+            'type'              => 'required|string',
+            'gender_type'       => 'required|string',
+            'price_per_month'   => 'required|numeric',
+            'address'           => 'required|string',
+            'facilities'        => 'nullable|string',
+            'public_facilities' => 'nullable|string', // 👈 DITAMBAHKAN
+            'rules'             => 'nullable|string', // 👈 DITAMBAHKAN
+            'description'       => 'nullable|string', // 👈 DITAMBAHKAN
+            'status'            => 'nullable|string',
+            'main_image'        => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+            'gallery_images'    => 'nullable|array',
+            'gallery_images.*'  => 'image|mimes:jpeg,png,jpg,webp|max:2048',
         ]);
 
         $user = Auth::guard('sanctum')->user();
@@ -110,16 +145,19 @@ class PropertyController extends Controller
         }
 
         $property = Properti::create([
-            'pemilik_id'      => $user->id, // 👈 Tersimpan otomatis ID user yang sedang login
-            'title'           => $request->title,
-            'type'            => $request->type,
-            'gender_type'     => $request->gender_type,
-            'price_per_month' => $request->price_per_month,
-            'address'         => $request->address,
-            'facilities'      => $request->facilities ?? 'Kamar Mandi Dalam',
-            'status'          => $request->status ?? 'Tersedia',
-            'main_image'      => $imagePath,
-            'gallery_images'  => $galleryPaths,
+            'pemilik_id'        => $user->id,
+            'title'             => $request->title,
+            'type'              => $request->type,
+            'gender_type'       => $request->gender_type,
+            'price_per_month'   => $request->price_per_month,
+            'address'           => $request->address,
+            'facilities'        => $request->facilities ?? 'Kamar Mandi Dalam',
+            'public_facilities' => $request->public_facilities, // 👈 DITAMBAHKAN
+            'rules'             => $request->rules,             // 👈 DITAMBAHKAN
+            'description'       => $request->description,       // 👈 DITAMBAHKAN
+            'status'            => $request->status ?? 'Tersedia',
+            'main_image'        => $imagePath,
+            'gallery_images'    => $galleryPaths,
         ]);
 
         $property->load('pemilik');
@@ -171,16 +209,19 @@ class PropertyController extends Controller
         }
 
         $request->validate([
-            'title'            => 'sometimes|required|string|max:255',
-            'type'             => 'sometimes|required|string',
-            'gender_type'      => 'sometimes|required|string',
-            'price_per_month'  => 'sometimes|required|numeric',
-            'address'          => 'sometimes|required|string',
-            'facilities'       => 'sometimes|nullable|string',
-            'status'           => 'sometimes|required|string',
-            'main_image'       => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
-            'gallery_images'   => 'nullable|array',
-            'gallery_images.*' => 'image|mimes:jpeg,png,jpg,webp|max:2048',
+            'title'             => 'sometimes|required|string|max:255',
+            'type'              => 'sometimes|required|string',
+            'gender_type'       => 'sometimes|required|string',
+            'price_per_month'   => 'sometimes|required|numeric',
+            'address'           => 'sometimes|required|string',
+            'facilities'        => 'sometimes|nullable|string',
+            'public_facilities' => 'sometimes|nullable|string', // 👈 DITAMBAHKAN
+            'rules'             => 'sometimes|nullable|string', // 👈 DITAMBAHKAN
+            'description'       => 'sometimes|nullable|string', // 👈 DITAMBAHKAN
+            'status'            => 'sometimes|required|string',
+            'main_image'        => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+            'gallery_images'    => 'nullable|array',
+            'gallery_images.*'  => 'image|mimes:jpeg,png,jpg,webp|max:2048',
         ]);
 
         $data = $request->except(['main_image', 'gallery_images']);

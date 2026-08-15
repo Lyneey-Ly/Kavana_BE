@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import SidebarUser from '../components/SidebarUser';
+import Footer from '../components/footer';
 
 export default function PusatBantuan() {
   // State Tab Aktif ('penyewa' | 'pemilik' | 'umum')
@@ -310,6 +311,7 @@ export default function PusatBantuan() {
         </a>
 
       </div>
+      <Footer />
     </SidebarUser>
   );
 }
