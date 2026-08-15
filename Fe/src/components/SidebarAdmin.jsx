@@ -70,14 +70,14 @@ export default function SidebarAdmin({ children }) {
 
   // 🟢 DAFTAR MENU NAVIGASI DENGAN VECTOR ICONS (lucide-react)
   const menuItems = [
-    { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
-    { name: 'Profil Admin', path: '/admin/profile', icon: User },
+    { name: 'Dashboard', path: '/admindashboard', icon: LayoutDashboard },
+    { name: 'Profil Admin', path: '/adminprofile', icon: User },
     { name: 'Kelola Properti', path: '/admin/properti', icon: Building2 },
-    { name: 'Penyewa Aktif', path: '/admin/penyewa', icon: Users },
-    { name: 'Tagihan & Order', path: '/admin/tagihan', icon: Receipt },
-    { name: 'Laporan Keuangan', path: '/admin/laporan', icon: TrendingUp },
-    { name: 'Kelola Komplain', path: '/admin/komplain', icon: AlertTriangle },
-    { name: 'Dokumen Sewa', path: '/admin/dokumen', icon: FileText },
+    { name: 'Penyewa Aktif', path: '/adminpenyewa', icon: Users },
+    { name: 'Tagihan & Order', path: '/adminTO', icon: Receipt },
+    { name: 'Laporan Keuangan', path: '/adminlaporan', icon: TrendingUp },
+    { name: 'Kelola Komplain', path: '/admin/Komplain', icon: AlertTriangle },
+    { name: 'Dokumen Sewa', path: '/admin/dokumen-sewa', icon: FileText },
   ];
 
   // Helper Foto Profil

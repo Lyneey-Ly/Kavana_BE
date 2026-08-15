@@ -216,18 +216,18 @@ export default function AdminPenyewa() {
                 <h3 className="text-3xl font-black text-[#261C19] mt-1">{loading ? "..." : `${totalAktif} Orang`}</h3>
               </div>
               
-              {/* Card 2 */}
+              {/* Card 2 (Akan Habis - Diubah jadi Merah/Rose) */}
               <div 
                 onClick={() => setFilterStatus("Akan Habis")}
                 className={`bg-white p-6 rounded-2xl border transition-all duration-300 shadow-sm hover:shadow-md cursor-pointer hover:-translate-y-1 ${
-                  filterStatus === "Akan Habis" ? "border-amber-500 ring-2 ring-amber-500/20" : "border-slate-200"
+                  filterStatus === "Akan Habis" ? "border-rose-500 ring-2 ring-rose-500/20" : "border-slate-200"
                 }`}
               >
                 <div className="flex items-center justify-between mb-3">
-                  <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                  <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
                     <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
                   </div>
-                  <span className="text-xs font-semibold px-2.5 py-1 bg-amber-100 text-amber-700 rounded-full">&lt; 30 Hari</span>
+                  <span className="text-xs font-semibold px-2.5 py-1 bg-rose-100 text-rose-700 rounded-full">&lt; 30 Hari</span>
                 </div>
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Kontrak Segera Habis</p>
                 <h3 className="text-3xl font-black text-[#261C19] mt-1">{loading ? "..." : `${totalAkanHabis} Penghuni`}</h3>
@@ -359,15 +359,15 @@ export default function AdminPenyewa() {
                             {formatDateIndo(tenant.endDate)}
                           </td>
 
-                          {/* Status Badge */}
+                          {/* Status Badge (Akan Habis diubah jadi merah/rose) */}
                           <td className="px-6 py-4">
                             <span className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider inline-flex items-center gap-1.5 ${
                               tenant.status === 'Aktif' ? 'bg-emerald-100 text-emerald-800' :
-                              tenant.status === 'Baru' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800 animate-pulse'
+                              tenant.status === 'Baru' ? 'bg-blue-100 text-blue-800' : 'bg-rose-100 text-rose-800 animate-pulse'
                             }`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${
                                 tenant.status === 'Aktif' ? 'bg-emerald-500' :
-                                tenant.status === 'Baru' ? 'bg-blue-500' : 'bg-amber-500'
+                                tenant.status === 'Baru' ? 'bg-blue-500' : 'bg-rose-500'
                               }`}></span>
                               {tenant.status}
                             </span>
@@ -480,9 +480,9 @@ export default function AdminPenyewa() {
                   </div>
                 </div>
 
-                {/* Reminder Alert if contract near end */}
+                {/* Reminder Alert if contract near end (Diubah jadi merah/rose) */}
                 {selectedTenant.status === 'Akan Habis' && (
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-medium flex items-center justify-between">
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-center justify-between">
                     <span>⚠️ Masa sewa akan berakhir kurang dari 30 hari lagi!</span>
                   </div>
                 )}
