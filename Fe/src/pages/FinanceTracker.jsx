@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import API from '../api'; 
 import SidebarUser from '../components/SidebarUser'; 
-import Swal from 'sweetalert2'; // 👈 Import SweetAlert2
+import Swal from 'sweetalert2'; 
 
 export default function FinanceTracker() {
   // 1. STATE UNTUK DATA TRANSAKSI & SUMMARY
@@ -69,7 +69,21 @@ export default function FinanceTracker() {
   // 🔌 4. HANDLE INPUT, SUBMIT (POST), & DELETE
   // =========================================================================
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+
+    if (name === 'amount') {
+      // 1. Hapus semua karakter yang bukan angka
+      const rawValue = value.replace(/\D/g, '');
+
+      // 2. Format dengan titik sebagai pemisah ribuan
+      const formattedValue = rawValue 
+        ? new Intl.NumberFormat('id-ID').format(rawValue) 
+        : '';
+
+      setFormData((prev) => ({ ...prev, amount: formattedValue }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -84,10 +98,13 @@ export default function FinanceTracker() {
     }
 
     try {
+      // Hilangkan titik pemisah sebelum dikirim ke backend
+      const cleanAmount = Number(String(formData.amount).replace(/\./g, ''));
+
       const payload = {
         type: formData.type,
         description: formData.description,
-        amount: Number(formData.amount),
+        amount: cleanAmount,
         category: formData.type === 'pemasukan' ? 'Pemasukan' : formData.category,
         date: formData.date
       };
@@ -138,7 +155,6 @@ export default function FinanceTracker() {
   };
 
   const handleDelete = async (id) => {
-    // SweetAlert Konfirmasi Hapus
     const result = await Swal.fire({
       title: 'Hapus Transaksi?',
       text: 'Transaksi yang dihapus tidak dapat dikembalikan!',
@@ -175,7 +191,7 @@ export default function FinanceTracker() {
     }
   };
 
-  // Format Rupiah
+  // Format Rupiah untuk Tampilan Tabel/Card
   const formatRupiah = (angka) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
   };
@@ -253,9 +269,18 @@ export default function FinanceTracker() {
                       <input type="text" name="description" value={formData.description} onChange={handleChange} placeholder="Cth: Makan Siang" className="w-full px-4 py-2.5 bg-slate-50 border border-[#D7C4B0] rounded text-sm outline-none focus:ring-1 focus:ring-[#B38E5D]" required />
                     </div>
 
+                    {/* INPUT NOMINAL (DIUBAH KE TEXT AGAR BISA FORMAT TITIK) */}
                     <div className="space-y-1">
                       <label className="block text-xs font-bold text-slate-600 uppercase">Nominal (Rp)</label>
-                      <input type="number" name="amount" value={formData.amount} onChange={handleChange} placeholder="Cth: 50000" className="w-full px-4 py-2.5 bg-slate-50 border border-[#D7C4B0] rounded text-sm outline-none focus:ring-1 focus:ring-[#B38E5D]" required />
+                      <input 
+                        type="text" 
+                        name="amount" 
+                        value={formData.amount} 
+                        onChange={handleChange} 
+                        placeholder="Cth: 50.000" 
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-[#D7C4B0] rounded text-sm outline-none focus:ring-1 focus:ring-[#B38E5D]" 
+                        required 
+                      />
                     </div>
 
                     {formData.type === 'pengeluaran' && (

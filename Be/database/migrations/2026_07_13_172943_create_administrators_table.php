@@ -18,7 +18,6 @@ return new class extends Migration
             $table->string('phone', 20);
             $table->string('password');
             $table->enum('role', ['pemilik', 'admin']);
-            $table->string('foto')->nullable();
             $table->timestamps();
         });
     }

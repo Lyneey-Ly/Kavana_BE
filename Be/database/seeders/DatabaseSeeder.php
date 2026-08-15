@@ -22,7 +22,7 @@ class DatabaseSeeder extends Seeder
             'email' => 'ahmad@kavana.com',
             'phone' => '081234567890',
             'password' => Hash::make('password123'),
-            'role' => 'pemilik',
+            'role' => 'admin',
             
         ]);
 

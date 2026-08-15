@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import API from '../api';
-import Swal from 'sweetalert2'; // 🌟 SweetAlert2 Import
+import Swal from 'sweetalert2';
 
 function Register() {
   const navigate = useNavigate();
@@ -17,6 +17,7 @@ function Register() {
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [role, setRole] = useState('user');
+  const [agreeTerms, setAgreeTerms] = useState(false); // 🌟 State Ceklis Kebijakan
 
   // State UI
   const [showPassword, setShowPassword] = useState(false);
@@ -44,7 +45,19 @@ function Register() {
   const handleRegister = async (e) => {
     e.preventDefault();
 
-    // 🌟 SweetAlert - Validasi Password Sesuai
+    // 🌟 Validasi SweetAlert - Ceklis Kebijakan Wajib Centang
+    if (!agreeTerms) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Persetujuan Diperlukan',
+        text: 'Anda wajib menyetujui Syarat & Ketentuan serta Kebijakan Privasi Kafana Vista untuk melanjutkan pendaftaran.',
+        confirmButtonColor: '#261C19',
+        customClass: { popup: 'rounded-2xl' }
+      });
+      return;
+    }
+
+    // 🌟 Validasi SweetAlert - Password Sesuai
     if (password !== passwordConfirmation) {
       Swal.fire({
         icon: 'warning',
@@ -56,7 +69,7 @@ function Register() {
       return;
     }
 
-    // 🌟 SweetAlert - Validasi Panjang Password
+    // 🌟 Validasi SweetAlert - Panjang Password
     if (password.length < 6) {
       Swal.fire({
         icon: 'warning',
@@ -91,7 +104,7 @@ function Register() {
         sessionStorage.setItem('user', JSON.stringify(user));
       }
 
-      // Jika pendaftaran ini terpicu dari proses booking di Detail Kamar
+      // Jika pendaftaran terpicu dari booking
       if (fromBooking && bookingData) {
         try {
           const bookingRes = await API.post('/pemesanan/booking', {
@@ -144,7 +157,7 @@ function Register() {
         }
       }
 
-      // 🌟 SweetAlert - Notifikasi Sukses Pendaftaran Biasa
+      // Notifikasi Sukses Pendaftaran Biasa
       Swal.fire({
         icon: 'success',
         title: 'Pendaftaran Berhasil! 🎉',
@@ -164,10 +177,9 @@ function Register() {
       let errorHtml = 'Gagal mendaftar. Silakan periksa kembali data Anda.';
 
       if (error.response && error.response.data) {
-        // Jika server mengembalikan objek validasi per-field (Laravel Validation Errors)
         if (error.response.data.errors) {
           const errorsObj = error.response.data.errors;
-          const errorList = Object.values(errorsObj).flat().map(err => `<li className="text-left">${err}</li>`).join('');
+          const errorList = Object.values(errorsObj).flat().map(err => `<li class="text-left">${err}</li>`).join('');
           errorHtml = `<ul class="text-xs text-rose-600 list-disc list-inside space-y-1">${errorList}</ul>`;
         } else if (error.response.data.message || error.response.data.error) {
           errorHtml = error.response.data.message || error.response.data.error;
@@ -176,7 +188,6 @@ function Register() {
         errorHtml = 'Terjadi kesalahan koneksi ke server. Silakan coba beberapa saat lagi.';
       }
 
-      // 🌟 SweetAlert - Notifikasi Error
       Swal.fire({
         icon: 'error',
         title: errorTitle,
@@ -266,8 +277,6 @@ function Register() {
 
             <form onSubmit={handleRegister} className="space-y-3.5">
               
-             
-
               {/* NAMA LENGKAP */}
               <div className="space-y-1">
                 <label className="block text-[10px] font-black uppercase tracking-wider text-gray-500">
@@ -383,6 +392,21 @@ function Register() {
                     )}
                   </button>
                 </div>
+              </div>
+
+              {/* 🌟 CEKLIS SYARAT & KEBIJAKAN PRIVASI */}
+              <div className="flex items-start gap-2 pt-1.5">
+                <input 
+                  type="checkbox" 
+                  id="agreeTerms"
+                  checked={agreeTerms}
+                  onChange={(e) => setAgreeTerms(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-[#D7C4B0] text-[#B38E5D] focus:ring-[#B38E5D] cursor-pointer"
+                  required
+                />
+                <label htmlFor="agreeTerms" className="text-[11px] text-gray-600 font-medium leading-tight cursor-pointer select-none">
+                  Saya menyetujui <a href="#" onClick={(e) => { e.preventDefault(); Swal.fire({ title: 'Syarat & Ketentuan', text: 'Ketentuan layanan Kafana Vista meliputi kepatuhan aturan hunian dan hak akses pengelola.', confirmButtonColor: '#261C19' }); }} className="underline font-extrabold text-[#261C19] hover:text-[#B38E5D]">Syarat &amp; Ketentuan</a> serta <a href="#" onClick={(e) => { e.preventDefault(); Swal.fire({ title: 'Kebijakan Privasi', text: 'Kafana Vista menjaga kerahasiaan data pengguna dan tidak membagikannya ke pihak ketiga tanpa izin.', confirmButtonColor: '#261C19' }); }} className="underline font-extrabold text-[#261C19] hover:text-[#B38E5D]">Kebijakan Privasi</a>. <span className="text-rose-500">*</span>
+                </label>
               </div>
 
               {/* TOMBOL SUBMIT */}

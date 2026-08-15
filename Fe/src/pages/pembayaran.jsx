@@ -232,7 +232,7 @@ export default function Pembayaran() {
           <h2 className="text-lg font-bold text-[#2D2321]">Transaksi Tidak Ditemukan</h2>
           <p className="text-xs text-[#5C4A42]">Tidak ada data pemesanan yang aktif untuk dibayar saat ini.</p>
           <button 
-            onClick={() => navigate('/')} 
+            onClick={() => navigate('/Home')} 
             className="w-full bg-[#2D2321] text-white py-3 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-[#B38E5D] transition cursor-pointer"
           >
             Kembali ke Beranda
@@ -261,10 +261,20 @@ export default function Pembayaran() {
 
       <div className="max-w-6xl mx-auto">
         
-        {/* HEADER */}
-        <div className="mb-8 animate-fade-up">
-          <h1 className="text-2xl md:text-3xl font-serif font-bold tracking-wide text-[#2D2321]">Konfirmasi Pembayaran</h1>
-          <p className="text-xs text-[#5C4A42] mt-1">Selesaikan pembayaran untuk mengamankan kamar pesanan Anda.</p>
+        {/* HEADER & TOMBOL KEMBALI */}
+        <div className="mb-8 animate-fade-up space-y-3">
+          <button
+            onClick={() => navigate('/Home')}
+            className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#5C4A42] hover:text-[#B38E5D] transition-all duration-200 cursor-pointer group hover:-translate-x-1"
+          >
+            <span className="text-base transition-transform group-hover:-translate-x-1">←</span>
+            <span>Kembali ke Beranda</span>
+          </button>
+
+          <div>
+            <h1 className="text-2xl md:text-3xl font-serif font-bold tracking-wide text-[#2D2321]">Konfirmasi Pembayaran</h1>
+            <p className="text-xs text-[#5C4A42] mt-1">Selesaikan pembayaran untuk mengamankan kamar pesanan Anda.</p>
+          </div>
         </div>
 
         {/* PESAN ERROR BILA ADA */}
@@ -550,10 +560,20 @@ export default function Pembayaran() {
               >
                 {isProcessing ? "MEMPROSES & MENGUNGGAH..." : "KONFIRMASI PEMBAYARAN"}
               </button>
+              
+              <button
+                onClick={() => navigate('/riwayattransaksi')}
+                className="w-full bg-[#B38E5D] text-white font-bold py-3.5 text-xs tracking-widest uppercase hover:bg-[#8F6E45] transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm"
+              >
+               <span className="text-base transition-transform group-hover:-translate-x-1"></span>
+               <span>Bayar Nanti</span>
+              </button>
 
               <p className="text-[10px] text-center text-[#5C4A42]/80 leading-relaxed">
                 *Bukti pembayaran akan diverifikasi oleh Admin. Anda dapat memantau status pesanan di halaman Riwayat Transaksi.
               </p>
+
+              
             </div>
           </div>
 
