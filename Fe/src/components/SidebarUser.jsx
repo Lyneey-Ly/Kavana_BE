@@ -117,7 +117,7 @@ export default function SidebarUser({ children }) {
 
   // 🟢 MENU NAVIGASI DENGAN LUCIDE VECTOR ICONS
   const menuItems = [
-    { name: 'Beranda', path: '/home', icon: Home },
+    { name: 'Beranda', path: '/beranda', icon: Home },
     { name: 'Cari hunian', path: '/carihunian', icon: Search },
     { name: 'Wishlist', path: '/whislist', icon: Heart },
     { name: 'Riwayat Booking', path: '/riwayattransaksi', icon: ClipboardList },
@@ -126,7 +126,7 @@ export default function SidebarUser({ children }) {
     { name: 'Dokumen Sewa', path: '/dokumen-sewa', icon: FileText, isCustomAction: true },
     { name: 'Complain', path: '/komplain', icon: AlertTriangle },
     { name: 'Testimoni', path: '/testimoni', icon: Star },
-    { name: 'Pusat bantuan', path: '/PusatBantuan', icon: HelpCircle },
+    { name: 'Pusat bantuan', path: '/pusatbantuanuser', icon: HelpCircle },
   ];
 
   // Helper Foto Profil

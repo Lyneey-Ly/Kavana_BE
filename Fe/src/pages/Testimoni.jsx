@@ -3,7 +3,7 @@ import API from '../api';
 import SidebarUser from '../components/SidebarUser';
 import Swal from 'sweetalert2';
 
-// 🟢 Sub-komponen Khusus Avatar agar Fallback Gambar Rusak Berjalan Sempurna
+// Sub-komponen Khusus Avatar agar Fallback Gambar Rusak Berjalan Sempurna
 function UserAvatar({ avatarUrl, userName, initial }) {
   const [imgError, setImgError] = useState(false);
 
@@ -26,6 +26,7 @@ export default function Testimoni() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Form State
   const [review, setReview] = useState('');
@@ -42,6 +43,25 @@ export default function Testimoni() {
     
     const cleanPath = avatarPath.replace(/^\/?storage\//, '').replace(/^\/+/, '');
     return `http://127.0.0.1:8000/storage/${cleanPath}`;
+  };
+
+  // Fetch Identitas User Saat Ini
+  const fetchCurrentUser = async () => {
+    try {
+      // Ambil data user dari localStorage jika ada
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        setCurrentUser(JSON.parse(storedUser));
+      }
+      
+      // Ambil data user resmi dari backend jika endpoint tersedia
+      const res = await API.get('/user');
+      if (res.data) {
+        setCurrentUser(res.data);
+      }
+    } catch (err) {
+      console.warn('Tidak dapat mengambil data pengguna login:', err);
+    }
   };
 
   // Fetch Semua Testimoni Website
@@ -64,12 +84,30 @@ export default function Testimoni() {
   };
 
   useEffect(() => {
+    fetchCurrentUser();
     fetchTestimonis();
   }, []);
+
+  // Periksa Apakah User Login Sudah Pernah Memberikan Testimoni
+  const hasSubmitted = Boolean(
+    currentUser && testimonis.some((item) => Number(item.user_id || item.user?.id) === Number(currentUser.id))
+  );
 
   // Submit Form Testimoni Baru
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (hasSubmitted) {
+      Swal.fire({
+        title: 'Batas Tercapai',
+        text: 'Anda sudah pernah memberikan testimoni. Setiap akun hanya diperbolehkan memberikan 1 testimoni.',
+        icon: 'warning',
+        confirmButtonColor: '#261C19'
+      });
+      setShowModal(false);
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -89,13 +127,15 @@ export default function Testimoni() {
       setRating(5);
       setShowModal(false);
 
-      // Refresh Data
+      // Refresh Data Testimoni
       fetchTestimonis();
     } catch (err) {
       console.error('Gagal mengirim testimoni:', err);
+      const errorMsg = err.response?.data?.message || 'Gagal mengirim ulasan, silakan coba lagi.';
+      
       Swal.fire({
         title: 'Gagal Mengirim',
-        text: err.response?.data?.message || 'Gagal mengirim ulasan, silakan coba lagi.',
+        text: errorMsg,
         icon: 'error',
         confirmButtonColor: '#261C19'
       });
@@ -141,11 +181,25 @@ export default function Testimoni() {
               </p>
             </div>
 
+            {/* TOMBOL TULIS TESTIMONI / TESTIMONI TERKIRIM */}
             <button
-              onClick={() => setShowModal(true)}
-              className="bg-[#261C19] hover:bg-[#3D2D29] text-white px-6 py-3.5 rounded-2xl text-xs font-extrabold uppercase tracking-widest transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 cursor-pointer flex-shrink-0"
+              onClick={() => !hasSubmitted && setShowModal(true)}
+              disabled={hasSubmitted}
+              className={`px-6 py-3.5 rounded-2xl text-xs font-extrabold uppercase tracking-widest transition shadow-lg flex items-center justify-center gap-2 flex-shrink-0 ${
+                hasSubmitted
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 cursor-not-allowed opacity-90'
+                  : 'bg-[#261C19] hover:bg-[#3D2D29] text-white hover:shadow-xl cursor-pointer'
+              }`}
             >
-              <span>✍️</span> Tulis Testimoni
+              {hasSubmitted ? (
+                <>
+                  <span>✅</span> Testimoni Terkirim
+                </>
+              ) : (
+                <>
+                  <span>✍️</span> Tulis Testimoni
+                </>
+              )}
             </button>
           </div>
 
@@ -201,8 +255,6 @@ export default function Testimoni() {
                       {/* CARD HEADER USER INFO */}
                       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                         <div className="flex items-center gap-3">
-                          
-                          {/* FOTO PROFIL / FALLBACK VIA SUB-KOMPONEN */}
                           <div className="w-10 h-10 rounded-full bg-[#261C19] text-[#C5A059] font-extrabold flex items-center justify-center text-sm shadow-xs overflow-hidden flex-shrink-0 border border-[#C5A059]/30">
                             <UserAvatar avatarUrl={avatarUrl} userName={userName} initial={initial} />
                           </div>
@@ -240,7 +292,7 @@ export default function Testimoni() {
       </div>
 
       {/* MODAL FORM TULIS TESTIMONI */}
-      {showModal && (
+      {showModal && !hasSubmitted && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white max-w-lg w-full rounded-3xl p-6 md:p-8 border border-[#E5D7C5] shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200">
             
@@ -260,7 +312,7 @@ export default function Testimoni() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               
-              {/* RATING INTERAKTIF (Bintang) */}
+              {/* RATING INTERAKTIF */}
               <div className="space-y-2 text-center py-3 bg-[#FAF6F0] rounded-2xl border border-[#E5D7C5]/60">
                 <label className="block text-xs font-extrabold uppercase tracking-wider text-[#C5A059]">
                   Berapa Rating Layanan/Website Kami?

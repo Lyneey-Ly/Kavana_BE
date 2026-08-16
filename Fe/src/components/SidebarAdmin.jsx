@@ -78,6 +78,7 @@ export default function SidebarAdmin({ children }) {
     { name: 'Laporan Keuangan', path: '/adminlaporan', icon: TrendingUp },
     { name: 'Kelola Komplain', path: '/admin/Komplain', icon: AlertTriangle },
     { name: 'Dokumen Sewa', path: '/admin/dokumen-sewa', icon: FileText },
+    { name: 'PusatBantuan', path: '/pusatbantuanadmin', icon: FileText },
   ];
 
   // Helper Foto Profil

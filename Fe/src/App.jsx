@@ -28,6 +28,10 @@ import NotificationBell from './components/NotificationBell';
 import Wishlist from './pages/whislist';
 import Footer from './components/footer';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
+import PusatBantuanuser from './pages/pusatbantuanuser';
+import PusatBantuanAdmin from './pages/pusatbantuanadmin';
+import Beranda from './pages/beranda';
+
 
 
 
@@ -43,6 +47,7 @@ export default function App() {
           {/* Main Landing Page */}
           <Route path="/" element={<Home />} />
           <Route path="/home" element={<Home />} />
+          <Route path="/beranda" element={<Beranda />} />
           
           
           {/* Halaman Home bertema Seaside */}
@@ -68,6 +73,7 @@ export default function App() {
           <Route path="/whislist" element={<Wishlist />} /> 
           <Route path="/footer" element={<Footer />} /> 
           <Route path="/SuperAdminDashboard" element={<SuperAdminDashboard />} /> 
+          <Route path="/pusatbantuanuser" element={<PusatBantuanuser />} /> 
 
           
           <Route path="/dokumen-sewa/:id" element={<Dokumen />} />
@@ -84,6 +90,8 @@ export default function App() {
           <Route path="/admin/dokumen-sewa" element={<AdminDokumenSewa />} />
           <Route path="/admin/dokumen-sewa/:id" element={<AdminDokumenSewa />} />
           <Route path="/NotificationBell" element={<NotificationBell />} />
+          <Route path="/pusatbantuanadmin" element={<PusatBantuanAdmin />} /> 
+
 
         </Routes>
       </div>
