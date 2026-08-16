@@ -9,8 +9,9 @@ export default function AdminTagihanOrder() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // 2. STATE UNTUK FILTER
+  // 2. STATE UNTUK FILTER & PENCARIAN
   const [filterStatus, setFilterStatus] = useState("Semua");
+  const [searchName, setSearchName] = useState(""); // 🌟 State untuk input pencarian nama
 
   // 3. STATE MODAL VERIFIKASI / DETAIL & LIGHTBOX
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -96,21 +97,29 @@ export default function AdminTagihanOrder() {
     }
   };
 
-  // Filter Data
+  // 🌟 Filter Data: Berdasarkan Status DAN Pencarian Nama
   const filteredInvoices = invoices.filter(inv => {
-    if (filterStatus === "Semua") return true;
+    // 1. Cek Filter Status
+    let matchStatus = false;
     const status = (inv.status || "").toUpperCase();
     
-    if (filterStatus === "Pending") {
-      return status === "PENDING" || status === "DIVERIFIKASI" || status === "MENUNGGU VERIFIKASI";
+    if (filterStatus === "Semua") {
+      matchStatus = true;
+    } else if (filterStatus === "Pending") {
+      matchStatus = status === "PENDING" || status === "DIVERIFIKASI" || status === "MENUNGGU VERIFIKASI";
+    } else if (filterStatus === "Lunas") {
+      matchStatus = status === "LUNAS" || status === "SELESAI" || status === "DIKONFIRMASI";
+    } else if (filterStatus === "Jatuh Tempo") {
+      matchStatus = status === "JATUH TEMPO" || status === "EXPIRED" || status === "DITOLAK";
+    } else {
+      matchStatus = status === filterStatus.toUpperCase();
     }
-    if (filterStatus === "Lunas") {
-      return status === "LUNAS" || status === "SELESAI" || status === "DIKONFIRMASI";
-    }
-    if (filterStatus === "Jatuh Tempo") {
-      return status === "JATUH TEMPO" || status === "EXPIRED" || status === "DITOLAK";
-    }
-    return status === filterStatus.toUpperCase();
+
+    // 2. Cek Filter Pencarian Nama
+    const customerName = (inv.customer?.nama || inv.customer?.name || inv.user?.name || inv.nama_pemesan || "Penyewa").toLowerCase();
+    const matchName = customerName.includes(searchName.toLowerCase());
+
+    return matchStatus && matchName;
   });
 
   // Summary Cards Count
@@ -265,27 +274,42 @@ export default function AdminTagihanOrder() {
           {/* ================= TABEL DATA ================= */}
           <div className="bg-white rounded-3xl border border-[#E5D7C5] shadow-xs overflow-hidden">
             
-            {/* TABS FILTER SECTION */}
-            <div className="px-6 py-5 border-b border-[#E5D7C5] flex flex-col sm:flex-row justify-between items-center gap-4 bg-[#FAF6F0]/40">
-              <h2 className="text-base font-extrabold text-[#261C19] flex items-center gap-2">
+            {/* TABS FILTER & SEARCH SECTION */}
+            <div className="px-6 py-5 border-b border-[#E5D7C5] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#FAF6F0]/40">
+              <h2 className="text-base font-extrabold text-[#261C19] flex items-center gap-2 whitespace-nowrap">
                 <svg className="w-5 h-5 text-[#C5A059]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                 Daftar Invoice
               </h2>
               
-              <div className="flex gap-2 overflow-x-auto no-scrollbar max-w-full">
-                {['Semua', 'Pending', 'Lunas', 'Jatuh Tempo'].map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setFilterStatus(tab)}
-                    className={`px-4 py-2 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer border ${
-                      filterStatus === tab
-                        ? 'bg-[#261C19] text-white border-[#261C19] shadow-md'
-                        : 'bg-white text-slate-500 border-[#E5D7C5] hover:bg-slate-50 hover:text-[#261C19]'
-                    }`}
-                  >
-                    {tab === 'Lunas' ? 'Lunas / Selesai' : tab}
-                  </button>
-                ))}
+              <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                {/* 🌟 INPUT SEARCH NAME */}
+                <div className="relative w-full sm:w-56 md:w-64">
+                  <input
+                    type="text"
+                    placeholder="Cari nama penyewa..."
+                    value={searchName}
+                    onChange={(e) => setSearchName(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 rounded-xl text-xs font-medium border border-[#E5D7C5] focus:outline-none focus:border-[#C5A059] focus:ring-1 focus:ring-[#C5A059] bg-white transition-all shadow-sm placeholder-slate-400 text-[#261C19]"
+                  />
+                  <svg className="w-4 h-4 text-[#C5A059] absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+
+                {/* TABS BUTTONS */}
+                <div className="flex gap-2 overflow-x-auto no-scrollbar max-w-full w-full sm:w-auto pb-1 sm:pb-0">
+                  {['Semua', 'Pending', 'Lunas', 'Jatuh Tempo'].map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setFilterStatus(tab)}
+                      className={`px-4 py-2.5 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer border ${
+                        filterStatus === tab
+                          ? 'bg-[#261C19] text-white border-[#261C19] shadow-md'
+                          : 'bg-white text-slate-500 border-[#E5D7C5] hover:bg-slate-50 hover:text-[#261C19]'
+                      }`}
+                    >
+                      {tab === 'Lunas' ? 'Lunas / Selesai' : tab}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -356,7 +380,7 @@ export default function AdminTagihanOrder() {
                       <td colSpan="6" className="px-6 py-16 text-center bg-slate-50/50">
                         <span className="text-4xl block mb-3 opacity-50">📭</span>
                         <p className="text-sm font-bold text-slate-600">Tidak Ada Tagihan Ditemukan</p>
-                        <p className="text-xs text-slate-400 mt-1">Coba ubah filter atau segarkan halaman.</p>
+                        <p className="text-xs text-slate-400 mt-1">Coba ubah filter atau pencarian.</p>
                       </td>
                     </tr>
                   )}
