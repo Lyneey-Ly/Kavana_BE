@@ -1,246 +1,264 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import API from '../api';
+import { motion } from 'framer-motion';
+import { 
+  Search, Wallet, MessageSquare, FileText, 
+  AlertTriangle, Heart, Bell, MapPin, 
+  Wifi, ShieldCheck, Sparkles, ChevronRight, HelpCircle
+} from 'lucide-react';
 
-export default function Home() {
+// --- ANIMATION VARIANTS ---
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { 
+    opacity: 1, 
+    transition: { staggerChildren: 0.1 } 
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    transition: { type: "spring", stiffness: 100, damping: 15 } 
+  }
+};
+
+export default function HomeUser() {
   const navigate = useNavigate();
-  const [featuredRooms, setFeaturedRooms] = useState([]);
-  const [loadingRooms, setLoadingRooms] = useState(true);
+  
+  // State dummy untuk simulasi data user (Bisa diganti dengan data dari API/Session)
+  const [user, setUser] = useState({
+    name: "Faiz",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150&auto=format&fit=crop",
+    activeLease: {
+      unitName: "Unit #204 - Premium Suite",
+      daysLeft: 124,
+      currentBill: 4500000,
+      dueDate: "10 September 2026",
+    }
+  });
 
-  // Ambil beberapa data kamar untuk ditampilkan di landing page
-  useEffect(() => {
-    const fetchRooms = async () => {
-      try {
-        const res = await API.get('/properti'); // Sesuaikan endpoint API publik properti Anda
-        const data = res.data?.data || res.data || [];
-        setFeaturedRooms(data.slice(0, 3)); // Ambil 3 properti unggulan
-      } catch (err) {
-        console.error("Gagal memuat properti unggulan:", err);
-      } finally {
-        setLoadingRooms(false);
-      }
-    };
-    fetchRooms();
-  }, []);
-
-  const formatRupiah = (angka) => {
-    if (!angka || isNaN(angka)) return "Rp 0";
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+  const formatRupiah = (number) => {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(number);
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF5EF] text-[#261C19] font-sans selection:bg-[#B38E5D] selection:text-white">
+    <div className="min-h-screen bg-[#FAF5EF] text-[#261C19] font-sans selection:bg-[#B38E5D] selection:text-white relative overflow-hidden">
       
-      {/* ================= NAVBAR ================= */}
-      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#D7C4B0]/40 px-6 md:px-12 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/Home')}>
-          <div className="p-2 rounded-xl bg-[#261C19] text-[#B38E5D]">
-            <svg className="w-6 h-6" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M25 20V80H35V53L55 80H68L45 49L65 20H52L35 43V20H25Z" fill="currentColor" />
-            </svg>
+      {/* --- AMBIENT GLOW BACKGROUNDS --- */}
+      <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-[#B38E5D]/10 rounded-full blur-[100px] pointer-events-none"></div>
+      <div className="absolute top-1/3 right-0 w-[400px] h-[400px] bg-[#C5A059]/10 rounded-full blur-[100px] pointer-events-none"></div>
+
+      {/* --- NAVBAR HEADER --- */}
+      <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-[#B38E5D]/20 px-6 md:px-12 py-4 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/home')}>
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#261C19] to-[#3D2D29] text-[#B38E5D] flex items-center justify-center font-serif font-black text-lg shadow-lg border border-[#C5A059]/30">
+            K
           </div>
-          <span className="text-lg font-black tracking-[0.2em] uppercase text-[#261C19]">
-            KAFANA <span className="text-[#B38E5D]">VISTA</span>
+          <span className="text-lg font-serif font-black tracking-[0.15em] uppercase text-[#261C19]">
+            Kafana<span className="text-[#B38E5D] font-light">Vista</span>
           </span>
         </div>
-
-        <div className="hidden md:flex items-center gap-8 text-xs font-bold uppercase tracking-widest text-gray-600">
-          <a href="#beranda" className="hover:text-[#B38E5D] transition">Beranda</a>
-          <a href="#fitur" className="hover:text-[#B38E5D] transition">Keunggulan</a>
-          <a href="#katalog" className="hover:text-[#B38E5D] transition">Katalog Kamar</a>
-          <a href="#tentang" className="hover:text-[#B38E5D] transition">Tentang Kami</a>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Link 
-            to="/login" 
-            className="px-4 py-2 text-xs font-black uppercase tracking-wider text-[#261C19] hover:text-[#B38E5D] transition"
-          >
-            Masuk
-          </Link>
-          <Link 
-            to="/register" 
-            className="px-5 py-2.5 bg-[#B38E5D] hover:bg-[#916F42] text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md shadow-[#B38E5D]/20 transition active:scale-95"
-          >
-            Daftar
-          </Link>
+        <div className="flex items-center gap-4">
+          <button className="relative p-2 text-gray-500 hover:text-[#B38E5D] transition-colors rounded-full hover:bg-white/50">
+            <Bell size={20} />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full animate-pulse border border-white"></span>
+          </button>
+          <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#B38E5D]/30 shadow-md">
+            <img src={user.avatar} alt="User Avatar" className="w-full h-full object-cover" />
+          </div>
         </div>
       </nav>
 
-      {/* ================= HERO SECTION ================= */}
-      <section id="beranda" className="relative px-6 md:px-12 py-20 md:py-28 max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-12">
-        <div className="absolute top-10 left-10 w-72 h-72 bg-[#B38E5D]/10 rounded-full blur-3xl pointer-events-none"></div>
-
-        <div className="flex-1 space-y-6 text-center md:text-left relative z-10">
-          <span className="inline-block px-3.5 py-1.5 rounded-full bg-[#B38E5D]/15 text-[#B38E5D] text-[10px] font-black uppercase tracking-[0.25em] border border-[#B38E5D]/30">
-            Eksklusif &amp; Nyaman
-          </span>
-          <h1 className="text-4xl md:text-6xl font-black tracking-tight text-[#261C19] leading-tight">
-            Temukan Hunian Impian Anda Bersama <span className="text-[#B38E5D]">Kafana Vista</span>
-          </h1>
-          <p className="text-sm md:text-base text-gray-600 font-medium max-w-xl leading-relaxed">
-            Platform manajemen dan pemesanan hunian eksklusif dengan fasilitas premium, sistem sewa transparan, dan kenyamanan maksimal di lokasi strategis.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-3 pt-4">
-            <a 
-              href="#katalog" 
-              className="w-full sm:w-auto px-7 py-3.5 bg-[#261C19] hover:bg-[#3D2D29] text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg transition text-center"
-            >
-              Jelajahi Kamar
-            </a>
-            <Link 
-              to="/register" 
-              className="w-full sm:w-auto px-7 py-3.5 bg-white hover:bg-gray-50 text-[#261C19] border border-[#D7C4B0] text-xs font-black uppercase tracking-widest rounded-xl transition text-center"
-            >
-              Buat Akun Cepat
-            </Link>
-          </div>
-        </div>
-
-        <div className="flex-1 relative w-full max-w-lg md:max-w-none">
-          <div className="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-white aspect-[4/3] group">
-            <img 
-              src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?q=80&w=800&auto=format&fit=crop" 
-              alt="Luxury Building" 
-              className="w-full h-full object-cover group-hover:scale-105 transition duration-700"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#261C19]/60 via-transparent to-transparent"></div>
-            <div className="absolute bottom-6 left-6 right-6 text-white p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
-              <p className="text-xs font-black uppercase tracking-widest text-[#FAF5EF]">✨ Hunian Pilihan Terverifikasi</p>
-              <p className="text-[11px] text-gray-200 mt-0.5">Dilengkapi keamanan 24 jam dan fasilitas lengkap siap huni.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ================= KEUNGGULAN / FITUR ================= */}
-      <section id="fitur" className="bg-white py-20 px-6 md:px-12 border-y border-[#D7C4B0]/40">
-        <div className="max-w-7xl mx-auto space-y-12">
-          <div className="text-center space-y-2 max-w-xl mx-auto">
-            <span className="text-[10px] font-black uppercase tracking-[0.25em] text-[#B38E5D]">Mengapa Memilih Kami</span>
-            <h2 className="text-2xl md:text-3xl font-black tracking-tight text-[#261C19]">Kenyamanan Tanpa Kompromi</h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-[#FAF5EF]/50 p-8 rounded-3xl border border-[#D7C4B0]/60 space-y-4 hover:shadow-md transition">
-              <div className="w-12 h-12 rounded-2xl bg-[#B38E5D]/15 text-[#B38E5D] flex items-center justify-center font-bold text-xl">
-                📍
-              </div>
-              <h3 className="font-extrabold text-base text-[#261C19]">Lokasi Strategis</h3>
-              <p className="text-xs text-gray-600 leading-relaxed font-medium">
-                Berada di pusat kota dekat area perkantoran, kampus, dan pusat perbelanjaan dengan akses transportasi mudah.
-              </p>
-            </div>
-
-            <div className="bg-[#FAF5EF]/50 p-8 rounded-3xl border border-[#D7C4B0]/60 space-y-4 hover:shadow-md transition">
-              <div className="w-12 h-12 rounded-2xl bg-[#B38E5D]/15 text-[#B38E5D] flex items-center justify-center font-bold text-xl">
-                🛡️
-              </div>
-              <h3 className="font-extrabold text-base text-[#261C19]">Keamanan 24 Jam</h3>
-              <p className="text-xs text-gray-600 leading-relaxed font-medium">
-                Dilengkapi dengan sistem pengamanan CCTV, akses kartu pintar, dan penjaga profesional demi ketenangan Anda.
-              </p>
-            </div>
-
-            <div className="bg-[#FAF5EF]/50 p-8 rounded-3xl border border-[#D7C4B0]/60 space-y-4 hover:shadow-md transition">
-              <div className="w-12 h-12 rounded-2xl bg-[#B38E5D]/15 text-[#B38E5D] flex items-center justify-center font-bold text-xl">
-                ⚡
-              </div>
-              <h3 className="font-extrabold text-base text-[#261C19]">Fasilitas Premium</h3>
-              <p className="text-xs text-gray-600 leading-relaxed font-medium">
-                Wi-Fi berkecepatan tinggi, AC, perabotan lengkap berkualitas tinggi, dan area komunal yang nyaman.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ================= KATALOG PROPERTI UNGGULAN ================= */}
-      <section id="katalog" className="py-20 px-6 md:px-12 max-w-7xl mx-auto space-y-12">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-[0.25em] text-[#B38E5D]">Eksklusif Portfolio</span>
-            <h2 className="text-2xl md:text-3xl font-black tracking-tight text-[#261C19]">Kamar &amp; Unit Tersedia</h2>
-          </div>
-          <button 
-            onClick={() => navigate('/login')}
-            className="text-xs font-black uppercase tracking-widest text-[#261C19] hover:text-[#B38E5D] underline transition cursor-pointer"
-          >
-            Lihat Semua Unit →
-          </button>
-        </div>
-
-        {loadingRooms ? (
-          <div className="py-16 text-center">
-            <div className="w-8 h-8 border-4 border-[#B38E5D] border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p className="text-xs font-bold text-gray-400 mt-3 uppercase tracking-widest">Memuat Unit Kamar...</p>
-          </div>
-        ) : featuredRooms.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {featuredRooms.map((room) => (
-              <div key={room.id} className="bg-white rounded-3xl border border-[#D7C4B0]/60 overflow-hidden shadow-sm hover:shadow-lg transition-all flex flex-col justify-between">
-                <div>
-                  <div className="relative h-52 overflow-hidden bg-gray-100">
-                    <img 
-                      src={room.main_image ? (room.main_image.startsWith('http') ? room.main_image : `http://localhost:8000/storage/${room.main_image}`) : "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=500&q=80"} 
-                      alt={room.title || room.nama_kamar} 
-                      className="w-full h-full object-cover hover:scale-105 transition duration-500"
-                    />
-                    <span className="absolute top-3 right-3 bg-[#261C19]/80 backdrop-blur-xs text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">
-                      {room.status || 'Tersedia'}
-                    </span>
-                  </div>
-                  <div className="p-6 space-y-2">
-                    <h3 className="font-extrabold text-base text-[#261C19] truncate">{room.title || room.nama_kamar}</h3>
-                    <p className="text-xs text-gray-500 font-medium truncate">📍 {room.address || room.lokasi || 'Kafana Vista Complex'}</p>
-                    <p className="text-sm font-black text-[#B38E5D] pt-2">
-                      {formatRupiah(room.price_per_month)} <span className="text-[10px] text-gray-400 font-normal">/bulan</span>
-                    </p>
-                  </div>
-                </div>
-                <div className="p-6 pt-0">
-                  <button 
-                    onClick={() => navigate('/login')}
-                    className="w-full py-2.5 bg-[#FAF5EF] hover:bg-[#261C19] text-[#261C19] hover:text-white text-xs font-black uppercase tracking-wider rounded-xl transition border border-[#D7C4B0]"
-                  >
-                    Pesan / Lihat Detail
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="p-12 bg-white rounded-3xl border border-[#D7C4B0]/60 text-center space-y-2">
-            <span className="text-3xl">🏠</span>
-            <p className="text-sm font-bold text-gray-700">Belum ada unit kamar yang ditampilkan.</p>
-          </div>
-        )}
-      </section>
-
-      {/* ================= FOOTER ================= */}
-      <footer className="bg-[#261C19] text-[#FAF5EF] py-12 px-6 md:px-12 border-t border-[#B38E5D]/20">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6 text-center md:text-left">
+      {/* --- MAIN CONTENT --- */}
+      <motion.main 
+        className="max-w-7xl mx-auto px-6 md:px-12 py-8 space-y-10 relative z-10"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        
+        {/* 1. HERO WELCOME & STATUS BANNER */}
+        <motion.section variants={itemVariants} className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-2">
-            <div className="flex items-center justify-center md:justify-start gap-2">
-              <div className="p-1.5 rounded-lg bg-[#B38E5D] text-[#261C19]">
-                <svg className="w-4 h-4" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M25 20V80H35V53L55 80H68L45 49L65 20H52L35 43V20H25Z" fill="currentColor" />
-                </svg>
-              </div>
-              <span className="text-sm font-black tracking-[0.2em] uppercase text-white">
-                KAFANA <span className="text-[#B38E5D]">VISTA</span>
-              </span>
-            </div>
-            <p className="text-xs text-gray-400 max-w-xs font-light">
-              Platform manajemen dan pemesanan hunian eksklusif dengan kenyamanan maksimal.
+            <h1 className="text-3xl md:text-5xl font-serif font-black tracking-tight text-[#261C19] flex items-center gap-3">
+              Selamat Datang Kembali, {user.name} <Sparkles className="text-[#B38E5D]" size={32} />
+            </h1>
+            <p className="text-sm md:text-base text-gray-600 font-medium max-w-xl leading-relaxed">
+              Kelola hunian impianmu dan nikmati kenyamanan hidup berkelas eksklusif di Kafana Vista.
             </p>
           </div>
 
-          <div className="text-xs text-gray-400 font-medium">
-            &copy; 2026 KAFANA VISTA. ALL RIGHTS RESERVED.
+          {user.activeLease && (
+            <div className="bg-white/80 backdrop-blur-md border border-[#B38E5D]/30 px-5 py-3.5 rounded-2xl shadow-lg flex items-center gap-4 shrink-0">
+              <div className="relative flex h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white"></span>
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Status Penghuni: Aktif</p>
+                <p className="font-bold text-[#261C19] text-sm">{user.activeLease.unitName}</p>
+                <p className="text-xs text-[#B38E5D] font-extrabold mt-0.5">Sisa Masa Sewa: {user.activeLease.daysLeft} Hari</p>
+              </div>
+            </div>
+          )}
+        </motion.section>
+
+        {/* 2. ACTIVE LEASE & PAYMENT QUICK ACTION CARD */}
+        <motion.section variants={itemVariants}>
+          <div className="relative overflow-hidden bg-gradient-to-br from-[#211715] via-[#2A1F1D] to-[#1A1311] text-[#FAF5EF] rounded-3xl p-8 shadow-2xl border border-[#4A3B32]">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-[#C5A059]/20 to-transparent rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+              <div className="space-y-4">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-[0.25em] text-[#C5A059] block mb-1">
+                    Tagihan Bulan Berjalan
+                  </span>
+                  <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight">
+                    {formatRupiah(user.activeLease.currentBill)}
+                  </h2>
+                </div>
+                <div className="flex items-center gap-2 text-xs font-medium text-slate-300 bg-white/5 w-fit px-3 py-1.5 rounded-lg border border-white/10">
+                  <AlertTriangle size={14} className="text-amber-400" />
+                  Jatuh tempo pada <strong className="text-white">{user.activeLease.dueDate}</strong>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <Link to="/dokumen-sewa" className="px-6 py-3.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition border border-white/10 flex items-center justify-center gap-2 backdrop-blur-sm">
+                  <FileText size={16} /> Dokumen Sewa
+                </Link>
+                <Link to="/pembayaran" className="relative group overflow-hidden px-8 py-3.5 bg-gradient-to-r from-[#C5A059] to-[#9C7A3C] text-[#1E1614] text-xs font-black uppercase tracking-widest rounded-xl transition shadow-[0_0_20px_rgba(197,160,89,0.3)] flex items-center justify-center gap-2">
+                  <span className="absolute inset-0 w-full h-full bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500 ease-in-out"></span>
+                  <Wallet size={16} /> Bayar Sekarang
+                </Link>
+              </div>
+            </div>
           </div>
+        </motion.section>
+
+        {/* 3. QUICK ACCESS MENU GRID */}
+        <motion.section variants={itemVariants}>
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-lg font-serif font-black text-[#261C19]">Akses Cepat</h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {[
+              { title: "Cari Hunian", icon: Search, link: "/carihunian", color: "bg-blue-50 text-blue-600" },
+              { title: "Finance Tracker", icon: Wallet, link: "/financetracker", color: "bg-emerald-50 text-emerald-600" },
+              { title: "Room Chat", icon: MessageSquare, link: "/roomchat", color: "bg-purple-50 text-purple-600" },
+              { title: "Dokumen Sewa", icon: FileText, link: "/dokumen-sewa", color: "bg-amber-50 text-amber-600" },
+              { title: "Maintenance", icon: AlertTriangle, link: "/komplain", color: "bg-rose-50 text-rose-600" },
+              { title: "Wishlist Favorit", icon: Heart, link: "/wishlist", color: "bg-pink-50 text-pink-600" },
+            ].map((menu, index) => (
+              <Link key={index} to={menu.link} className="group relative bg-white/60 backdrop-blur-md p-5 rounded-2xl border border-[#D7C4B0]/50 hover:border-[#B38E5D]/60 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 flex flex-col items-center justify-center text-center gap-3 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#B38E5D]/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className={`p-3 rounded-xl transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-1 ${menu.color}`}>
+                  <menu.icon size={24} />
+                </div>
+                <span className="text-xs font-bold text-[#261C19] group-hover:text-[#B38E5D] transition-colors">{menu.title}</span>
+              </Link>
+            ))}
+          </div>
+        </motion.section>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          
+          {/* 4. REKOMENDASI HUNIAN EKSKLUSIF (2 Columns on Desktop) */}
+          <motion.section variants={itemVariants} className="lg:col-span-2 space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-serif font-black text-[#261C19]">Rekomendasi Eksklusif</h3>
+                <p className="text-xs text-slate-500 font-medium">Temukan standar hidup baru yang memukau.</p>
+              </div>
+              <Link to="/carihunian" className="text-xs font-black uppercase tracking-widest text-[#B38E5D] hover:text-[#261C19] transition flex items-center gap-1">
+                Lihat Semua <ChevronRight size={14} />
+              </Link>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {[
+                { img: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=600&auto=format&fit=crop", name: "Vista Penthouse 01", price: 8500000, loc: "Tower A, Lantai 40", tag: "Hot Offer", color: "bg-rose-500" },
+                { img: "https://images.unsplash.com/photo-1502672260266-1c1c24226133?q=80&w=600&auto=format&fit=crop", name: "Executive Suite A", price: 6200000, loc: "Tower B, Lantai 12", tag: "Tersedia", color: "bg-[#B38E5D]" },
+              ].map((room, i) => (
+                <div key={i} className="group bg-white rounded-3xl border border-[#D7C4B0]/60 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500">
+                  <div className="relative h-48 overflow-hidden">
+                    <img src={room.img} alt={room.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-700" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#261C19]/80 to-transparent opacity-60"></div>
+                    
+                    <span className={`absolute top-3 left-3 text-white text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full shadow-md ${room.color}`}>
+                      {room.tag}
+                    </span>
+                    <button className="absolute top-3 right-3 p-2 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-rose-500 hover:text-white transition duration-300 border border-white/30">
+                      <Heart size={16} />
+                    </button>
+                    
+                    <div className="absolute bottom-3 left-3 text-white">
+                      <h4 className="font-extrabold text-base drop-shadow-md">{room.name}</h4>
+                      <p className="text-[10px] flex items-center gap-1 font-medium opacity-90"><MapPin size={10} /> {room.loc}</p>
+                    </div>
+                  </div>
+                  <div className="p-5 flex items-center justify-between bg-white">
+                    <div>
+                      <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider block">Mulai Dari</p>
+                      <p className="text-sm font-black text-[#B38E5D]">{formatRupiah(room.price)}<span className="text-[10px] text-gray-400 font-medium">/bln</span></p>
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="p-1.5 bg-[#FAF5EF] rounded-md text-[#B38E5D] border border-[#D7C4B0]/40"><Wifi size={14}/></div>
+                      <div className="p-1.5 bg-[#FAF5EF] rounded-md text-[#B38E5D] border border-[#D7C4B0]/40"><ShieldCheck size={14}/></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.section>
+
+          {/* 5. WIDGET PENGUMUMAN & LAYANAN PENGHUNI */}
+          <motion.section variants={itemVariants} className="space-y-5">
+            <h3 className="text-lg font-serif font-black text-[#261C19]">Layanan & Pengumuman</h3>
+            
+            <div className="bg-white/80 backdrop-blur-md rounded-3xl border border-[#D7C4B0]/60 shadow-sm p-6 space-y-4">
+              <div className="p-4 bg-[#FAF5EF] rounded-2xl border border-[#B38E5D]/20 flex gap-4 items-start group hover:border-[#B38E5D]/50 transition">
+                <div className="p-2.5 bg-white rounded-xl shadow-sm text-[#C5A059] group-hover:scale-110 transition shrink-0">
+                  <Sparkles size={18} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-extrabold text-[#261C19]">Jadwal Housekeeping Bulanan</h4>
+                  <p className="text-[10px] text-gray-500 font-medium mt-1 leading-relaxed">Unit Anda dijadwalkan untuk pembersihan AC & general cleaning pada 15 Sept 2026.</p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-gradient-to-r from-[#261C19] to-[#3D2D29] rounded-2xl border border-[#4A3B32] flex gap-4 items-center group">
+                <div className="p-2.5 bg-white/10 rounded-xl shadow-sm text-[#C5A059] shrink-0 backdrop-blur-sm">
+                  <Wallet size={18} />
+                </div>
+                <div className="text-white">
+                  <h4 className="text-xs font-extrabold">Promo Early Bird Perpanjangan</h4>
+                  <p className="text-[10px] text-gray-400 font-medium mt-0.5">Diskon 10% s.d akhir bulan.</p>
+                </div>
+              </div>
+            </div>
+          </motion.section>
+          
         </div>
-      </footer>
+      </motion.main>
+
+      {/* 6. FAST HELP / CONCIERGE FLOATING WIDGET */}
+      <motion.button 
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: "spring", stiffness: 260, damping: 20, delay: 0.5 }}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-[#C5A059] to-[#9C7A3C] text-white rounded-full shadow-[0_10px_25px_rgba(197,160,89,0.5)] flex items-center justify-center z-50 group border-2 border-white"
+        title="Bantuan Concierge"
+      >
+        <HelpCircle size={24} className="group-hover:rotate-12 transition duration-300" />
+        <span className="absolute -top-1 -right-1 w-3 h-3 bg-rose-500 rounded-full border-2 border-white animate-pulse"></span>
+      </motion.button>
 
     </div>
   );
