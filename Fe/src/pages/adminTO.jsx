@@ -11,13 +11,19 @@ export default function AdminTagihanOrder() {
 
   // 2. STATE UNTUK FILTER & PENCARIAN
   const [filterStatus, setFilterStatus] = useState("Semua");
-  const [searchName, setSearchName] = useState(""); // 🌟 State untuk input pencarian nama
+  const [searchName, setSearchName] = useState("");
 
   // 3. STATE MODAL VERIFIKASI / DETAIL & LIGHTBOX
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [previewImage, setPreviewImage] = useState(null); // State untuk zoom foto bukti
+  const [previewImage, setPreviewImage] = useState(null);
+
+  // 💡 HELPER: Cek apakah status sudah final (tidak boleh diubah lagi)
+  const isStatusFinal = (statusStr) => {
+    const s = (statusStr || "").toUpperCase();
+    return ['DIKONFIRMASI', 'DITOLAK', 'LUNAS', 'SELESAI', 'EXPIRED', 'JATUH TEMPO', 'CANCEL', 'APPROVED'].includes(s);
+  };
 
   // =========================================================================
   // 🔌 FETCH DATA DARI BACKEND LARAVEL
@@ -46,6 +52,17 @@ export default function AdminTagihanOrder() {
   // =========================================================================
   const handleKonfirmasiStatus = async (statusTarget) => {
     if (!selectedInvoice) return;
+
+    // 🔒 GUARD CHECK FRONTEND: Cek apakah status sudah final
+    if (isStatusFinal(selectedInvoice.status)) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Tidak Dapat Diubah!',
+        text: `Status pesanan ini sudah "${selectedInvoice.status}" dan tidak dapat diubah lagi.`,
+        confirmButtonColor: '#261C19'
+      });
+      return;
+    }
 
     // Konfirmasi sebelum eksekusi
     const confirmResult = await Swal.fire({
@@ -97,9 +114,8 @@ export default function AdminTagihanOrder() {
     }
   };
 
-  // 🌟 Filter Data: Berdasarkan Status DAN Pencarian Nama
+  // Filter Data
   const filteredInvoices = invoices.filter(inv => {
-    // 1. Cek Filter Status
     let matchStatus = false;
     const status = (inv.status || "").toUpperCase();
     
@@ -115,14 +131,12 @@ export default function AdminTagihanOrder() {
       matchStatus = status === filterStatus.toUpperCase();
     }
 
-    // 2. Cek Filter Pencarian Nama
     const customerName = (inv.customer?.nama || inv.customer?.name || inv.user?.name || inv.nama_pemesan || "Penyewa").toLowerCase();
     const matchName = customerName.includes(searchName.toLowerCase());
 
     return matchStatus && matchName;
   });
 
-  // Summary Cards Count
   const totalPending = invoices.filter(i => {
     const s = (i.status || "").toUpperCase();
     return s === "DIVERIFIKASI" || s === "PENDING" || s === "MENUNGGU VERIFIKASI";
@@ -138,13 +152,11 @@ export default function AdminTagihanOrder() {
     return s === "JATUH TEMPO" || s === "EXPIRED" || s === "DITOLAK";
   }).length;
 
-  // Format Rupiah
   const formatRupiah = (angka) => {
     if (!angka || isNaN(angka)) return "Rp 0";
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
   };
 
-  // Badge Style dengan Animasi Dots
   const renderBadge = (statusStr) => {
     const s = (statusStr || "").toUpperCase();
     
@@ -179,19 +191,17 @@ export default function AdminTagihanOrder() {
     );
   };
 
-  // Helper untuk path foto bukti transfer
   const proofPath = selectedInvoice?.pembayaran?.payment_proof || selectedInvoice?.payment_proof;
 
   return (
     <SidebarAdmin>
       <div className="min-h-screen bg-[#FAF6F0] p-4 md:p-8 text-[#261C19] relative font-sans">
         
-        {/* AMBIENT GLOW DEKORATIF */}
         <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#C5A059]/10 rounded-full blur-3xl pointer-events-none"></div>
 
         <div className="max-w-7xl mx-auto space-y-6 relative z-10">
           
-          {/* ================= HEADER SECTION ================= */}
+          {/* HEADER SECTION */}
           <div className="bg-white/90 backdrop-blur-md p-6 md:p-8 rounded-3xl border border-[#E5D7C5] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <span className="text-[10px] font-black uppercase tracking-widest text-[#C5A059] block mb-1">
@@ -220,9 +230,8 @@ export default function AdminTagihanOrder() {
             </div>
           )}
 
-          {/* ================= SUMMARY CARDS ================= */}
+          {/* SUMMARY CARDS */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* Card Total */}
             <div 
               className={`bg-white p-5 rounded-3xl border shadow-xs flex flex-col justify-between space-y-3 cursor-pointer transition-all duration-300 hover:shadow-md hover:-translate-y-1 ${filterStatus === 'Semua' ? 'border-[#C5A059] ring-2 ring-[#C5A059]/20' : 'border-[#E5D7C5]'}`} 
               onClick={() => setFilterStatus("Semua")}
@@ -234,7 +243,6 @@ export default function AdminTagihanOrder() {
               </div>
             </div>
 
-            {/* Card Pending */}
             <div 
               className={`bg-white p-5 rounded-3xl border shadow-xs flex flex-col justify-between space-y-3 cursor-pointer transition-all duration-300 hover:shadow-md hover:-translate-y-1 ${filterStatus === 'Pending' ? 'border-amber-400 ring-2 ring-amber-400/20' : 'border-[#E5D7C5]'}`} 
               onClick={() => setFilterStatus("Pending")}
@@ -246,7 +254,6 @@ export default function AdminTagihanOrder() {
               </div>
             </div>
 
-            {/* Card Lunas */}
             <div 
               className={`bg-white p-5 rounded-3xl border shadow-xs flex flex-col justify-between space-y-3 cursor-pointer transition-all duration-300 hover:shadow-md hover:-translate-y-1 ${filterStatus === 'Lunas' ? 'border-emerald-400 ring-2 ring-emerald-400/20' : 'border-[#E5D7C5]'}`} 
               onClick={() => setFilterStatus("Lunas")}
@@ -258,7 +265,6 @@ export default function AdminTagihanOrder() {
               </div>
             </div>
 
-            {/* Card Jatuh Tempo */}
             <div 
               className={`bg-white p-5 rounded-3xl border shadow-xs flex flex-col justify-between space-y-3 cursor-pointer transition-all duration-300 hover:shadow-md hover:-translate-y-1 ${filterStatus === 'Jatuh Tempo' ? 'border-rose-400 ring-2 ring-rose-400/20' : 'border-[#E5D7C5]'}`} 
               onClick={() => setFilterStatus("Jatuh Tempo")}
@@ -271,10 +277,9 @@ export default function AdminTagihanOrder() {
             </div>
           </div>
 
-          {/* ================= TABEL DATA ================= */}
+          {/* TABEL DATA */}
           <div className="bg-white rounded-3xl border border-[#E5D7C5] shadow-xs overflow-hidden">
             
-            {/* TABS FILTER & SEARCH SECTION */}
             <div className="px-6 py-5 border-b border-[#E5D7C5] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#FAF6F0]/40">
               <h2 className="text-base font-extrabold text-[#261C19] flex items-center gap-2 whitespace-nowrap">
                 <svg className="w-5 h-5 text-[#C5A059]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
@@ -282,7 +287,6 @@ export default function AdminTagihanOrder() {
               </h2>
               
               <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-                {/* 🌟 INPUT SEARCH NAME */}
                 <div className="relative w-full sm:w-56 md:w-64">
                   <input
                     type="text"
@@ -294,7 +298,6 @@ export default function AdminTagihanOrder() {
                   <svg className="w-4 h-4 text-[#C5A059] absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                 </div>
 
-                {/* TABS BUTTONS */}
                 <div className="flex gap-2 overflow-x-auto no-scrollbar max-w-full w-full sm:w-auto pb-1 sm:pb-0">
                   {['Semua', 'Pending', 'Lunas', 'Jatuh Tempo'].map((tab) => (
                     <button
@@ -355,7 +358,7 @@ export default function AdminTagihanOrder() {
                             <span className="font-bold text-[#261C19] block">{customerName}</span>
                             <span className="text-[10px] text-slate-400 block mt-0.5">{inv.created_at?.split('T')[0] || "-"}</span>
                           </td>
-                          <td className="px-6 py-4 font-medium text-slate-600 truncate max-wxs">{roomName}</td>
+                          <td className="px-6 py-4 font-medium text-slate-600 truncate max-w-xs">{roomName}</td>
                           <td className="px-6 py-4 font-black text-[#261C19]">{formatRupiah(amount)}</td>
                           <td className="px-6 py-4">
                             {renderBadge(status)}
@@ -396,9 +399,7 @@ export default function AdminTagihanOrder() {
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* 🔍 LIGHTBOX MODAL (PREVIEW FOTO ZOOM) */}
-      {/* ========================================================================= */}
+      {/* LIGHTBOX MODAL (PREVIEW FOTO ZOOM) */}
       {previewImage && (
         <div 
           onClick={() => setPreviewImage(null)}
@@ -417,9 +418,7 @@ export default function AdminTagihanOrder() {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 🔍 MODAL POPUP VERIFIKASI & DETAIL BOOKING */}
-      {/* ========================================================================= */}
+      {/* MODAL POPUP VERIFIKASI & DETAIL BOOKING */}
       {isModalOpen && selectedInvoice && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh] border border-[#E5D7C5] animate-in zoom-in-95 duration-200">
@@ -494,32 +493,53 @@ export default function AdminTagihanOrder() {
             </div>
 
             {/* Footer Modal / Tombol Aksi */}
-            <div className="p-6 border-t border-slate-100 bg-white flex flex-wrap sm:flex-nowrap gap-3">
-              <button
-                onClick={() => setIsModalOpen(false)}
-                disabled={submitting}
-                className="w-full sm:w-auto px-5 py-3 text-slate-600 bg-slate-100 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-slate-200 transition cursor-pointer"
-              >
-                Batal
-              </button>
+            <div className="p-6 border-t border-slate-100 bg-white">
+              {/* 🔒 JIKA STATUS SUDAH FINAL (DIKONFIRMASI / DITOLAK / LUNAS / SELESAI / EXPIRED) */}
+              {isStatusFinal(selectedInvoice.status) ? (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 w-full">
+                  <div className="w-full sm:flex-1 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2">
+                    <svg className="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>Status pesanan ini sudah <strong>{selectedInvoice.status}</strong> dan tidak dapat diubah lagi.</span>
+                  </div>
+                  <button
+                    onClick={() => setIsModalOpen(false)}
+                    className="w-full sm:w-auto px-5 py-3 text-slate-600 bg-slate-100 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-slate-200 transition cursor-pointer"
+                  >
+                    Tutup
+                  </button>
+                </div>
+              ) : (
+                /* 🔓 JIKA STATUS MASIH PENDING / MENUNGGU VERIFIKASI */
+                <div className="flex flex-wrap sm:flex-nowrap gap-3 w-full">
+                  <button
+                    onClick={() => setIsModalOpen(false)}
+                    disabled={submitting}
+                    className="w-full sm:w-auto px-5 py-3 text-slate-600 bg-slate-100 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-slate-200 transition cursor-pointer"
+                  >
+                    Batal
+                  </button>
 
-              <button
-                onClick={() => handleKonfirmasiStatus('Ditolak')}
-                disabled={submitting}
-                className="w-full sm:w-1/2 px-5 py-3 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white border border-rose-200 hover:border-rose-500 rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex justify-center items-center gap-2"
-              > 
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                {submitting ? 'Memproses...' : 'Tolak'}
-              </button>
+                  <button
+                    onClick={() => handleKonfirmasiStatus('Ditolak')}
+                    disabled={submitting}
+                    className="w-full sm:w-1/2 px-5 py-3 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white border border-rose-200 hover:border-rose-500 rounded-xl text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex justify-center items-center gap-2"
+                  > 
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    {submitting ? 'Memproses...' : 'Tolak'}
+                  </button>
 
-              <button
-                onClick={() => handleKonfirmasiStatus('Dikonfirmasi')}
-                disabled={submitting}
-                className="w-full sm:w-1/2 px-5 py-3 bg-[#261C19] hover:bg-[#C5A059] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-lg disabled:opacity-50 flex justify-center items-center gap-2 cursor-pointer"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-                <span>{submitting ? 'Memproses...' : 'Terima & Verifikasi'}</span>
-              </button>
+                  <button
+                    onClick={() => handleKonfirmasiStatus('Dikonfirmasi')}
+                    disabled={submitting}
+                    className="w-full sm:w-1/2 px-5 py-3 bg-[#261C19] hover:bg-[#C5A059] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-lg disabled:opacity-50 flex justify-center items-center gap-2 cursor-pointer"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="00 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                    <span>{submitting ? 'Memproses...' : 'Terima & Verifikasi'}</span>
+                  </button>
+                </div>
+              )}
             </div>
 
           </div>

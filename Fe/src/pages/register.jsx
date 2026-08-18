@@ -104,57 +104,26 @@ function Register() {
         sessionStorage.setItem('user', JSON.stringify(user));
       }
 
-      // Jika pendaftaran terpicu dari booking
+      // 🌟 PERBAIKAN: Jika pendaftaran terpicu dari booking, langsung kembali ke Detail Kamar
       if (fromBooking && bookingData) {
-        try {
-          const bookingRes = await API.post('/pemesanan/booking', {
-            properti_id: bookingData.properti_id,
-            kamar_id: bookingData.kamar_id,
-            check_in_date: bookingData.check_in_date,
-            duration_months: bookingData.duration_months
-          });
+        const propertiId = bookingData.properti_id || bookingData.property_id;
 
-          const pemesananId = bookingRes.data?.data?.id || bookingRes.data?.id || bookingRes.data?.pemesanan_id;
+        await Swal.fire({
+          icon: 'success',
+          title: 'Akun Berhasil Dibuat! 🎉',
+          text: 'Mengalihkan kembali ke halaman Detail Kamar...',
+          timer: 1800,
+          showConfirmButton: false,
+          customClass: { popup: 'rounded-2xl' }
+        });
 
-          const dataDikirim = {
-            pemesanan_id: pemesananId, 
-            property_id: bookingData.properti_id,
-            kamar_id: bookingData.kamar_id,
-            nomorKamar: bookingData.nomorKamar,
-            namaProperti: bookingData.namaProperti,
-            tipeKamar: bookingData.tipeKamar,
-            hargaSewa: bookingData.hargaSewa,
-            durasiSewa: bookingData.durasiSewaText,
-            tanggalMasuk: bookingData.tanggalMasukFormatted,
-            biayaLayanan: bookingData.biayaLayanan,
-            totalBayar: bookingData.totalBayar, 
-            gambar: bookingData.gambar
-          };
-
-          await Swal.fire({
-            icon: 'success',
-            title: 'Akun Berhasil Dibuat! 🎉',
-            text: 'Meneruskan ke halaman pembayaran...',
-            timer: 1800,
-            showConfirmButton: false,
-            customClass: { popup: 'rounded-2xl' }
-          });
-
-          navigate('/pembayaran', { state: { itemTransaksi: dataDikirim } });
-          return;
-        } catch (bookingErr) {
-          console.error('Error auto booking:', bookingErr);
-          const errMsg = bookingErr.response?.data?.message || 'Akun berhasil dibuat, tetapi gagal memproses booking.';
-          await Swal.fire({
-            icon: 'warning',
-            title: 'Akun Terbuat, Pemesanan Terkendala',
-            text: `${errMsg} Silakan lakukan pemesanan ulang dari halaman detail kamar.`,
-            confirmButtonColor: '#261C19',
-            customClass: { popup: 'rounded-2xl' }
-          });
-          navigate(`/kamar/${bookingData.properti_id}`);
-          return;
-        }
+        // Redirect kembali ke Detail Kamar
+        navigate(`/kamar/${propertiId}`, { 
+          state: { 
+            bookingData: bookingData 
+          } 
+        });
+        return;
       }
 
       // Notifikasi Sukses Pendaftaran Biasa
@@ -267,153 +236,142 @@ function Register() {
                   <p>Unit: <span className="font-bold text-[#B38E5D]">{bookingData.nomorKamar}</span></p>
                   <p>Durasi: <span className="font-bold text-[#261C19]">{bookingData.durasiSewaText}</span></p>
                   <p>Check-in: <span className="font-bold text-[#261C19]">{bookingData.tanggalMasukFormatted}</span></p>
-                  <p>Total: <span className="font-bold text-emerald-700">{bookingData.totalBayar}</span></p>
+                  <p>Total: <span className="font-bold text-[#B38E5D]">{bookingData.totalBayar}</span></p>
                 </div>
-                <p className="text-[10px] text-[#B38E5D] font-bold text-center pt-0.5">
-                  ✨ Setelah mendaftar, Anda akan langsung diarahkan ke Pembayaran!
-                </p>
               </div>
             )}
 
+            {/* FORM INPUT */}
             <form onSubmit={handleRegister} className="space-y-3.5">
               
               {/* NAMA LENGKAP */}
               <div className="space-y-1">
-                <label className="block text-[10px] font-black uppercase tracking-wider text-gray-500">
-                  Nama Lengkap <span className="text-rose-500">*</span>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                  Nama Lengkap
                 </label>
-                <input 
-                  type="text" 
-                  placeholder="Contoh: Ahmad Fauzi" 
-                  className="w-full px-3.5 py-2.5 border border-[#D7C4B0] rounded-xl text-xs font-medium outline-hidden focus:border-[#B38E5D] focus:ring-1 focus:ring-[#B38E5D] transition bg-[#FAF5EF]/20"
+                <input
+                  type="text"
+                  required
+                  placeholder="Masukkan nama lengkap"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  required 
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#D7C4B0] text-xs font-medium focus:outline-hidden focus:border-[#B38E5D] transition bg-[#FAF5EF]/30"
                 />
               </div>
 
               {/* EMAIL */}
               <div className="space-y-1">
-                <label className="block text-[10px] font-black uppercase tracking-wider text-gray-500">
-                  Alamat Email <span className="text-rose-500">*</span>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                  Alamat Email
                 </label>
-                <input 
-                  type="email" 
-                  placeholder="nama@email.com" 
-                  className="w-full px-3.5 py-2.5 border border-[#D7C4B0] rounded-xl text-xs font-medium outline-hidden focus:border-[#B38E5D] focus:ring-1 focus:ring-[#B38E5D] transition bg-[#FAF5EF]/20"
+                <input
+                  type="email"
+                  required
+                  placeholder="nama@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  required 
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#D7C4B0] text-xs font-medium focus:outline-hidden focus:border-[#B38E5D] transition bg-[#FAF5EF]/30"
                 />
               </div>
 
-              {/* TELEPON / PHONE */}
+              {/* NOMOR TELEPON */}
               <div className="space-y-1">
-                <label className="block text-[10px] font-black uppercase tracking-wider text-gray-500">
-                  Nomor WhatsApp / HP <span className="text-rose-500">*</span>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                  Nomor WhatsApp / Telepon
                 </label>
-                <input 
-                  type="tel" 
-                  placeholder="081234567890" 
-                  className="w-full px-3.5 py-2.5 border border-[#D7C4B0] rounded-xl text-xs font-medium outline-hidden focus:border-[#B38E5D] focus:ring-1 focus:ring-[#B38E5D] transition bg-[#FAF5EF]/20"
+                <input
+                  type="tel"
+                  required
+                  placeholder="08123456789"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  required 
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#D7C4B0] text-xs font-medium focus:outline-hidden focus:border-[#B38E5D] transition bg-[#FAF5EF]/30"
                 />
               </div>
 
               {/* KATA SANDI */}
               <div className="space-y-1">
-                <label className="block text-[10px] font-black uppercase tracking-wider text-gray-500">
-                  Kata Sandi <span className="text-rose-500">*</span>
-                </label>
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    Kata Sandi
+                  </label>
+                  {password && (
+                    <span className={`text-[9px] font-bold ${passStrength.label === 'Kuat' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {passStrength.label}
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
-                  <input 
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Minimal 6 karakter" 
-                    className="w-full pl-3.5 pr-10 py-2.5 border border-[#D7C4B0] rounded-xl text-xs font-medium outline-hidden focus:border-[#B38E5D] focus:ring-1 focus:ring-[#B38E5D] transition bg-[#FAF5EF]/20"
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Minimal 6 karakter"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    required 
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#D7C4B0] text-xs font-medium focus:outline-hidden focus:border-[#B38E5D] transition bg-[#FAF5EF]/30 pr-10"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-[#261C19] cursor-pointer"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs font-bold cursor-pointer"
                   >
-                    {showPassword ? (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858-5.908a8.962 8.962 0 013.682-.821c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m-4.092-4.092a3 3 0 11-4.243-4.243M3 3l18 18" /></svg>
-                    ) : (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                    )}
+                    {showPassword ? '🙈' : '👁️'}
                   </button>
                 </div>
-
-                {/* INDIKATOR KEKUATAN PASSWORD */}
+                {/* Strength Meter Bar */}
                 {password && (
-                  <div className="pt-1 space-y-1">
-                    <div className="h-1 w-full bg-gray-100 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full ${passStrength.color} transition-all duration-300`} 
-                        style={{ width: `${passStrength.strength}%` }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between items-center text-[9px] font-bold text-gray-400">
-                      <span>Kekuatan Kata Sandi:</span>
-                      <span className="uppercase">{passStrength.label}</span>
-                    </div>
+                  <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden mt-1">
+                    <div
+                      className={`h-full transition-all duration-300 ${passStrength.color}`}
+                      style={{ width: `${passStrength.strength}%` }}
+                    ></div>
                   </div>
                 )}
               </div>
 
               {/* KONFIRMASI KATA SANDI */}
               <div className="space-y-1">
-                <label className="block text-[10px] font-black uppercase tracking-wider text-gray-500">
-                  Ulangi Kata Sandi <span className="text-rose-500">*</span>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                  Konfirmasi Kata Sandi
                 </label>
                 <div className="relative">
-                  <input 
-                    type={showConfirmPassword ? "text" : "password"}
-                    placeholder="Masukkan ulang kata sandi" 
-                    className="w-full pl-3.5 pr-10 py-2.5 border border-[#D7C4B0] rounded-xl text-xs font-medium outline-hidden focus:border-[#B38E5D] focus:ring-1 focus:ring-[#B38E5D] transition bg-[#FAF5EF]/20"
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Ulangi kata sandi"
                     value={passwordConfirmation}
                     onChange={(e) => setPasswordConfirmation(e.target.value)}
-                    required 
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#D7C4B0] text-xs font-medium focus:outline-hidden focus:border-[#B38E5D] transition bg-[#FAF5EF]/30 pr-10"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-[#261C19] cursor-pointer"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs font-bold cursor-pointer"
                   >
-                    {showConfirmPassword ? (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858-5.908a8.962 8.962 0 013.682-.821c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m-4.092-4.092a3 3 0 11-4.243-4.243M3 3l18 18" /></svg>
-                    ) : (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                    )}
+                    {showConfirmPassword ? '🙈' : '👁️'}
                   </button>
                 </div>
               </div>
 
-              {/* 🌟 CEKLIS SYARAT & KEBIJAKAN PRIVASI */}
-              <div className="flex items-start gap-2 pt-1.5">
-                <input 
-                  type="checkbox" 
+              {/* PERSETUJUAN SYARAT & KETENTUAN */}
+              <div className="flex items-start gap-2 pt-1">
+                <input
+                  type="checkbox"
                   id="agreeTerms"
                   checked={agreeTerms}
                   onChange={(e) => setAgreeTerms(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-[#D7C4B0] text-[#B38E5D] focus:ring-[#B38E5D] cursor-pointer"
-                  required
+                  className="mt-0.5 rounded border-[#D7C4B0] text-[#B38E5D] focus:ring-[#B38E5D] cursor-pointer"
                 />
-                <label htmlFor="agreeTerms" className="text-[11px] text-gray-600 font-medium leading-tight cursor-pointer select-none">
-                  Saya menyetujui <a href="#" onClick={(e) => { e.preventDefault(); Swal.fire({ title: 'Syarat & Ketentuan', text: 'Ketentuan layanan Kafana Vista meliputi kepatuhan aturan hunian dan hak akses pengelola.', confirmButtonColor: '#261C19' }); }} className="underline font-extrabold text-[#261C19] hover:text-[#B38E5D]">Syarat &amp; Ketentuan</a> serta <a href="#" onClick={(e) => { e.preventDefault(); Swal.fire({ title: 'Kebijakan Privasi', text: 'Kafana Vista menjaga kerahasiaan data pengguna dan tidak membagikannya ke pihak ketiga tanpa izin.', confirmButtonColor: '#261C19' }); }} className="underline font-extrabold text-[#261C19] hover:text-[#B38E5D]">Kebijakan Privasi</a>. <span className="text-rose-500">*</span>
+                <label htmlFor="agreeTerms" className="text-[11px] text-gray-500 leading-tight cursor-pointer">
+                  Saya menyetujui <span className="font-bold text-[#261C19] underline">Syarat &amp; Ketentuan</span> serta <span className="font-bold text-[#261C19] underline">Kebijakan Privasi</span> Kafana Vista.
                 </label>
               </div>
 
               {/* TOMBOL SUBMIT */}
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={loading}
-                className="w-full bg-[#B38E5D] hover:bg-[#916F42] active:scale-[0.99] text-white py-3 text-xs font-black uppercase tracking-widest rounded-xl transition duration-200 shadow-lg shadow-[#B38E5D]/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-4 cursor-pointer"
+                className="w-full bg-[#261C19] hover:bg-[#B38E5D] text-white font-bold py-3.5 rounded-xl text-xs tracking-widest uppercase transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-4 cursor-pointer"
               >
                 {loading ? (
                   <>
@@ -431,15 +389,11 @@ function Register() {
 
             <div className="text-center text-xs font-medium text-gray-500 pt-2">
               <span>Sudah memiliki akun? </span>
-              <Link to="/login" state={location.state} className="font-extrabold text-[#261C19] hover:text-[#B38E5D] underline transition">
+              <Link to="/login" state={location.state} className="font-extra-bold text-[#B38E5D] hover:underline">
                 Masuk di sini
               </Link>
             </div>
 
-          </div>
-
-          <div className="text-center text-[10px] text-gray-400 font-semibold uppercase tracking-wider mt-6">
-            © 2026 KAFANA VISTA. ALL RIGHTS RESERVED.
           </div>
         </div>
 
