@@ -34,6 +34,7 @@ Route::get('/properties', [PropertyController::class, 'index']);
 Route::get('/properties/{id}', [PropertyController::class, 'show']);
 Route::get('/properties/{propertiId}/reviews', [ReviewController::class, 'getByProperti']);
 Route::get('/testimonis', [TestimoniController::class, 'index']);
+Route::post('/auth/google', [AuthController::class, 'googleLogin']);
 
 
 /*

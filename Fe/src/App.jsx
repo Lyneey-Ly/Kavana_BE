@@ -1,7 +1,10 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import LandingPage from './pages/landingpages'; // Landing Page awal
+import { GoogleOAuthProvider } from '@react-oauth/google';
+
+// Pages Import
+import LandingPage from './pages/landingpages';
 import Home from './pages/home';
-import UserProfile from './pages/profil';       // Jalur file profil
+import UserProfile from './pages/profil';
 import AdminDashboard from './pages/admindashboard';
 import AdminDataProperti from './pages/admindataproperti';
 import CariHunian from './pages/carihunian';
@@ -18,7 +21,7 @@ import KatalogProperti from './pages/katalogproperti';
 import PusatBantuan from './pages/PusatBantuan';
 import Riwayat from './pages/riwayattransaksi';
 import Dokumen from './pages/DokumenSewa';
-import KomplainUser from './pages/KomplainUser'; // Atau sesuaikan lokasi filenya
+import KomplainUser from './pages/KomplainUser';
 import AdminKomplain from './pages/AdminKomplain';
 import DetailKamar from './pages/detailkamar';
 import AdminProfile from './pages/AdminProfile'; 
@@ -32,69 +35,59 @@ import PusatBantuanuser from './pages/pusatbantuanuser';
 import PusatBantuanAdmin from './pages/pusatbantuanadmin';
 import Beranda from './pages/beranda';
 
-
-
-
-
-// Placeholder untuk halaman lain (biar routing ga error dulu)
-const BerandaUser = () => <div className="p-8 font-bold">Halaman Beranda User</div>;
+// Mengambil Client ID dari environment variable Vite (.env)
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "PASTE_GOOGLE_CLIENT_ID_DI_SINI";
 
 export default function App() {
   return (
-    <Router>
-      <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
-        <Routes>
-          {/* Main Landing Page */}
-          <Route path="/" element={<Home />} />
-          <Route path="/home" element={<Home />} />
-          <Route path="/beranda" element={<Beranda />} />
-          
-          
-          {/* Halaman Home bertema Seaside */}
-          <Route path="/landingpages" element={<LandingPage />} />
-          <Route path="/PusatBantuan" element={<PusatBantuan />} />
-          <Route path="/katalogproperti" element={<KatalogProperti />} />
-          
-          {/* Rute tunggal yang benar untuk halaman profile */}
-          <Route path="/profile" element={<UserProfile />} />
-          
-          {/* User Routes */}
-          <Route path="/beranda" element={<BerandaUser />} />
-          <Route path="/FinanceTracker" element={<FinanceTracker />} />
-          <Route path="/carihunian" element={<CariHunian />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/pembayaran" element={<Pembayaran />} />
-          <Route path="/kamar/:id" element={<DetailKamar />} />
-          <Route path="/riwayattransaksi" element={<Riwayat/>}/>
-          <Route path="/roomchat" element={<ChatRoom />} />
-          <Route path="/komplain" element={<KomplainUser />} />
-          <Route path="/testimoni" element={<Testimoni />} /> 
-          <Route path="/whislist" element={<Wishlist />} /> 
-          <Route path="/footer" element={<Footer />} /> 
-          <Route path="/SuperAdminDashboard" element={<SuperAdminDashboard />} /> 
-          <Route path="/pusatbantuanuser" element={<PusatBantuanuser />} /> 
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <Router>
+        <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
+          <Routes>
+            {/* Main Landing & Public Pages */}
+            <Route path="/" element={<Home />} />
+            <Route path="/home" element={<Home />} />
+            <Route path="/beranda" element={<Beranda />} />
+            <Route path="/landingpages" element={<LandingPage />} />
+            <Route path="/PusatBantuan" element={<PusatBantuan />} />
+            <Route path="/katalogproperti" element={<KatalogProperti />} />
+            
+            {/* User Profile & Auth */}
+            <Route path="/profile" element={<UserProfile />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            
+            {/* User Features */}
+            <Route path="/FinanceTracker" element={<FinanceTracker />} />
+            <Route path="/carihunian" element={<CariHunian />} />
+            <Route path="/pembayaran" element={<Pembayaran />} />
+            <Route path="/kamar/:id" element={<DetailKamar />} />
+            <Route path="/riwayattransaksi" element={<Riwayat />} />
+            <Route path="/roomchat" element={<ChatRoom />} />
+            <Route path="/komplain" element={<KomplainUser />} />
+            <Route path="/testimoni" element={<Testimoni />} /> 
+            <Route path="/whislist" element={<Wishlist />} /> 
+            <Route path="/footer" element={<Footer />} /> 
+            <Route path="/SuperAdminDashboard" element={<SuperAdminDashboard />} /> 
+            <Route path="/pusatbantuanuser" element={<PusatBantuanuser />} /> 
+            <Route path="/dokumen-sewa/:id" element={<Dokumen />} />
 
-          
-          <Route path="/dokumen-sewa/:id" element={<Dokumen />} />
-
-          {/* Admin Routes */}
-          <Route path="/adminprofile" element={<AdminProfile />} />
-          <Route path="/admindashboard" element={<AdminDashboard />} />
-          <Route path="/adminlaporan" element={<AdminLaporanKeuangan />} />
-          <Route path="/adminTO" element={<AdminTagihanOrder />} />
-          <Route path="/adminpenyewa" element={<AdminPenyewa />} />
-          <Route path="/adminpengaturan" element={<AdminPengaturan />} />
-          <Route path="/admin/properti" element={<AdminDataProperti />} />
-          <Route path="/admin/komplain" element={<AdminKomplain />} />
-          <Route path="/admin/dokumen-sewa" element={<AdminDokumenSewa />} />
-          <Route path="/admin/dokumen-sewa/:id" element={<AdminDokumenSewa />} />
-          <Route path="/NotificationBell" element={<NotificationBell />} />
-          <Route path="/pusatbantuanadmin" element={<PusatBantuanAdmin />} /> 
-
-
-        </Routes>
-      </div>
-    </Router>
+            {/* Admin Routes */}
+            <Route path="/adminprofile" element={<AdminProfile />} />
+            <Route path="/admindashboard" element={<AdminDashboard />} />
+            <Route path="/adminlaporan" element={<AdminLaporanKeuangan />} />
+            <Route path="/adminTO" element={<AdminTagihanOrder />} />
+            <Route path="/adminpenyewa" element={<AdminPenyewa />} />
+            <Route path="/adminpengaturan" element={<AdminPengaturan />} />
+            <Route path="/admin/properti" element={<AdminDataProperti />} />
+            <Route path="/admin/komplain" element={<AdminKomplain />} />
+            <Route path="/admin/dokumen-sewa" element={<AdminDokumenSewa />} />
+            <Route path="/admin/dokumen-sewa/:id" element={<AdminDokumenSewa />} />
+            <Route path="/NotificationBell" element={<NotificationBell />} />
+            <Route path="/pusatbantuanadmin" element={<PusatBantuanAdmin />} /> 
+          </Routes>
+        </div>
+      </Router>
+    </GoogleOAuthProvider>
   );
 }
