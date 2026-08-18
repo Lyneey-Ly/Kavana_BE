@@ -118,7 +118,7 @@ export default function Login() {
     switch (role) {
       case 'superadmin': navigate('/SuperAdminDashboard'); break;
       case 'admin': navigate('/admindashboard'); break;
-      default: navigate('/HomeUser');
+      default: navigate('/beranda');
     }
   };
 

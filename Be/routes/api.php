@@ -55,7 +55,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/users/{id}', [SuperAdminController::class, 'destroyUser']);
         Route::get('/admin-revenue', [SuperAdminController::class, 'adminRevenue']);
         Route::get('/transactions', [SuperAdminController::class, 'allTransactions']);
-        Route::get('/admin-list', [SuperAdminController::class, 'adminList']); // 💡 Sudah diperbaiki dari getAdminList ke adminList
+        Route::get('/admin-list', [SuperAdminController::class, 'adminList']);
     });
 
     // --- AUTH & PROFILE ---
@@ -98,7 +98,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/dokumen-sewa', [DokumenSewaController::class, 'indexUser']);
     Route::post('/pemesanan/{id}/ttd', [PemesananController::class, 'saveSignature']);
 
-    // --- 💬 CHAT SYSTEM ---
+    // --- 💬 CHAT SYSTEM (SELARAS DENGAN ADMINROOMCHAT.JSX) ---
     Route::post('/chat/direct', [ChatController::class, 'sendDirectMessage']);
     Route::get('/chat/direct/{receiverId}', [ChatController::class, 'getDirectMessages']);
     Route::get('/chat/my-active-properties', [ChatController::class, 'getMyActiveProperties']);

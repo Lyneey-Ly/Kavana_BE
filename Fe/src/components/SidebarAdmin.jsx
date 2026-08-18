@@ -79,6 +79,7 @@ export default function SidebarAdmin({ children }) {
     { name: 'Kelola Komplain', path: '/admin/Komplain', icon: AlertTriangle },
     { name: 'Dokumen Sewa', path: '/admin/dokumen-sewa', icon: FileText },
     { name: 'PusatBantuan', path: '/pusatbantuanadmin', icon: FileText },
+    { name: 'RoomChat', path: '/AdminRoomChat', icon: FileText },
   ];
 
   // Helper Foto Profil
