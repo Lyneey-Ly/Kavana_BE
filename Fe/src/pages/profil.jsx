@@ -27,6 +27,7 @@ export default function UserProfile() {
     name: '',
     email: '',
     phone: '',
+    current_password: '',
     password: '',
   });
 
@@ -56,6 +57,7 @@ export default function UserProfile() {
         name: apiUser?.name || '',
         email: apiUser?.email || '',
         phone: apiUser?.phone || '',
+        current_password: '',
         password: '',
       });
 
@@ -126,6 +128,7 @@ export default function UserProfile() {
       payload.append('phone', formState.phone ?? '');
 
       if (formState.password && formState.password.trim() !== '') {
+        payload.append('current_password', formState.current_password || '');
         payload.append('password', formState.password);
       }
 
@@ -141,6 +144,11 @@ export default function UserProfile() {
       setSuccessMessage(message);
       setIsEditing(false);
       setSelectedFile(null);
+      setFormState((prev) => ({
+        ...prev,
+        current_password: '',
+        password: '',
+      }));
       
       Swal.fire({
         icon: 'success',
@@ -319,6 +327,7 @@ export default function UserProfile() {
                         name: user?.name || '',
                         email: user?.email || '',
                         phone: user?.phone || '',
+                        current_password: '',
                         password: '',
                       });
                     }}
@@ -352,8 +361,7 @@ export default function UserProfile() {
               {/* SISI KANAN: STATUS SEWA & FORM EDIT (Col 8) */}
               <div className="lg:col-span-8 flex flex-col justify-between space-y-6">
                 
-                {/* 🌟 KARTU STATUS HUNIAN (TAMPILAN TERBAIK & PREMIUM) 🌟 */}
-                {/* 🔴 PERUBAHAN DI SINI: p-6 dirubah jadi p-5 dan space-y-6 jadi space-y-4 agar lebih padat */}
+                {/* KARTU STATUS HUNIAN */}
                 <div className="bg-white p-5 rounded-3xl border border-[#E5D7C5] shadow-sm transition hover:shadow-md space-y-4">
                   
                   {/* HEADER KARTU */}
@@ -384,23 +392,19 @@ export default function UserProfile() {
                     </div>
                   </div>
 
-                  {/* LIST HUNIAN DENGAN CARD MODERN */}
+                  {/* LIST HUNIAN */}
                   {rentStatus.length > 0 ? (
-                    // 🔴 PERUBAHAN DI SINI: Tambah max-h dan overflow-y-auto kalau huniannya banyak biar gak makan layar
                     <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
                       {rentStatus.map((item, index) => {
                         const cleanDuration = String(item.duration_months || '').replace(/bulan/gi, '').trim();
 
                         return (
-                          // 🔴 PERUBAHAN DI SINI: padding dari p-6 jadi p-4, flex row dimajukan ke sm:flex-row
                           <div 
                             key={item.id || index} 
                             className="group relative overflow-hidden bg-gradient-to-br from-[#FAF6F0] via-white to-[#F7F2EA] p-4 rounded-2xl border border-[#E5D7C5] hover:border-[#C5A059]/60 shadow-sm transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                           >
-                            {/* Aksen Emas Samping */}
                             <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-[#C5A059] to-[#8F6E45]"></div>
 
-                            {/* DETAIL PROPERTI */}
                             <div className="space-y-2 pl-2 flex-grow">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="bg-[#261C19] text-[#E5D7C5] text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md shadow-xs">
@@ -413,7 +417,6 @@ export default function UserProfile() {
                                 )}
                               </div>
 
-                              {/* 🔴 PERUBAHAN DI SINI: text lebih kecil */}
                               <h4 className="text-base font-black text-[#261C19] group-hover:text-[#C5A059] transition-colors leading-tight">
                                 {item.title || item.properti?.nama_properti || item.nama_properti || "Unit Kost Kafana Vista"}
                               </h4>
@@ -423,7 +426,6 @@ export default function UserProfile() {
                                 <span className="font-medium truncate">{item.address || item.properti?.alamat || "Lokasi Kost Kafana Vista"}</span>
                               </p>
                               
-                              {/* INFORMASI DATES & DURATION */}
                               <div className="flex flex-wrap items-center gap-2 pt-1">
                                 <div className="bg-white/90 px-2.5 py-1 rounded-lg border border-slate-200/90 text-[10px] text-slate-600 flex items-center gap-1 shadow-2xs">
                                   <span>📅 In:</span>
@@ -436,8 +438,6 @@ export default function UserProfile() {
                               </div>
                             </div>
                             
-                            {/* ACTION BUTTONS */}
-                            {/* 🔴 PERUBAHAN DI SINI: flex direction button lebih ringkas dan padding dikecilkan */}
                             <div className="flex sm:flex-col gap-2 w-full sm:w-36 shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-200/60">
                               <Link 
                                 to="/FinanceTracker" 
@@ -457,7 +457,6 @@ export default function UserProfile() {
                       })}
                     </div>
                   ) : (
-                    /* STATE JIKA TIDAK ADA SEWA */
                     <div className="p-5 bg-gradient-to-r from-[#FAF6F0] via-white to-[#FAF6F0] rounded-xl border-2 border-dashed border-[#C5A059]/40 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
                       <div className="space-y-1 max-w-md">
                         <span className="text-[10px] font-extrabold text-[#C5A059] uppercase tracking-widest">Kafana Exclusive</span>
@@ -573,6 +572,20 @@ export default function UserProfile() {
 
                           <div className="space-y-2">
                             <label className="text-xs font-extrabold text-[#261C19] uppercase tracking-wider block">
+                              Kata Sandi Saat Ini / Lama
+                            </label>
+                            <input 
+                              type="password"
+                              disabled={!isEditing}
+                              value={formState.current_password}
+                              onChange={(e) => setFormState({ ...formState, current_password: e.target.value })}
+                              className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-[#261C19] text-sm font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C5A059] disabled:opacity-80 disabled:bg-slate-100/70 transition shadow-2xs"
+                              placeholder={isEditing ? "Ketikkan kata sandi saat ini..." : "••••••••••••••••"}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-xs font-extrabold text-[#261C19] uppercase tracking-wider block">
                               Kata Sandi Baru (New Password)
                             </label>
                             <input 
@@ -581,7 +594,7 @@ export default function UserProfile() {
                               value={formState.password}
                               onChange={(e) => setFormState({ ...formState, password: e.target.value })}
                               className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-[#261C19] text-sm font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#C5A059] disabled:opacity-80 disabled:bg-slate-100/70 transition shadow-2xs"
-                              placeholder={isEditing ? "Ketikkan minimal 8 karakter..." : "••••••••••••••••"}
+                              placeholder={isEditing ? "Ketikkan minimal 6 karakter..." : "••••••••••••••••"}
                             />
                           </div>
                         </div>
@@ -594,6 +607,13 @@ export default function UserProfile() {
                             onClick={() => {
                               setIsEditing(false);
                               setSelectedFile(null);
+                              setFormState({
+                                name: user?.name || '',
+                                email: user?.email || '',
+                                phone: user?.phone || '',
+                                current_password: '',
+                                password: '',
+                              });
                             }}
                             className="px-5 py-2.5 border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs md:text-sm font-extrabold rounded-xl transition cursor-pointer"
                           >

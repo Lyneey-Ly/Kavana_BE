@@ -8,6 +8,9 @@ export default function DetailKamar() {
   const location = useLocation();
   const { id } = useParams();
 
+  // Status Login User
+  const isLoggedIn = !!(sessionStorage.getItem('token') || localStorage.getItem('token'));
+
   // State Utama Properti & Loading
   const [properti, setProperti] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -33,7 +36,7 @@ export default function DetailKamar() {
   const [newComment, setNewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
 
-  // 🌟 State Modal Dokumen Sewa & TTD Canvas
+  // State Modal Dokumen Sewa & TTD Canvas
   const [showDokumenModal, setShowDokumenModal] = useState(false);
   const [bookingResponse, setBookingResponse] = useState(null);
   const [isAgreed, setIsAgreed] = useState(false);
@@ -277,7 +280,7 @@ export default function DetailKamar() {
     return true;
   });
 
-  // 🖊️ LOGIKA CANVAS TANDA TANGAN DIGITAL (TTD)
+  // LOGIKA CANVAS TANDA TANGAN DIGITAL (TTD)
   const startDrawing = (e) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -320,7 +323,7 @@ export default function DetailKamar() {
     setHasSigned(false);
   };
 
-  // 🚀 PROSES 1: KLIK SEWA -> BUAT BOOKING & MUNCULKAN DOKUMEN SEWA + TTD
+  // PROSES 1: KLIK SEWA -> BUAT BOOKING & MUNCULKAN DOKUMEN SEWA + TTD
   const handleLanjutPembayaran = async () => {
     if (!properti) return;
 
@@ -345,8 +348,7 @@ export default function DetailKamar() {
     }
 
     // Status Login
-    const token = sessionStorage.getItem('token');
-    if (!token) {
+    if (!isLoggedIn) {
       const bookingData = {
         properti_id: properti.id,
         kamar_id: selectedKamar ? selectedKamar.id : null,
@@ -385,7 +387,6 @@ export default function DetailKamar() {
     try {
       Swal.showLoading();
 
-      // Panggil API untuk membuat Pemesanan & Draft Dokumen Sewa
       const response = await API.post('/pemesanan/booking', {
         properti_id: properti.id,
         kamar_id: selectedKamar ? selectedKamar.id : null,
@@ -395,7 +396,6 @@ export default function DetailKamar() {
 
       Swal.close();
 
-      // Simpan data booking ke state dan buka modal Dokumen Sewa + TTD
       setBookingResponse(response.data?.data || response.data);
       setShowDokumenModal(true);
       setIsAgreed(false);
@@ -413,68 +413,67 @@ export default function DetailKamar() {
   };
 
   const handleSelesaiTTDDanLanjutBayar = async () => {
-  if (!isAgreed) {
-    Swal.fire({ icon: 'warning', title: 'Persetujuan Diperlukan', text: 'Harap centang kotak persetujuan dokumen sewa terlebih dahulu.', confirmButtonColor: '#2D2321' });
-    return;
-  }
+    if (!isAgreed) {
+      Swal.fire({ icon: 'warning', title: 'Persetujuan Diperlukan', text: 'Harap centang kotak persetujuan dokumen sewa terlebih dahulu.', confirmButtonColor: '#2D2321' });
+      return;
+    }
 
-  if (!hasSigned) {
-    Swal.fire({ icon: 'warning', title: 'Tanda Tangan Belum Ada', text: 'Silakan bubuhkan tanda tangan Anda pada area yang disediakan.', confirmButtonColor: '#2D2321' });
-    return;
-  }
+    if (!hasSigned) {
+      Swal.fire({ icon: 'warning', title: 'Tanda Tangan Belum Ada', text: 'Silakan bubuhkan tanda tangan Anda pada area yang disediakan.', confirmButtonColor: '#2D2321' });
+      return;
+    }
 
-  const signatureImage = canvasRef.current ? canvasRef.current.toDataURL() : null;
+    const signatureImage = canvasRef.current ? canvasRef.current.toDataURL() : null;
 
-  try {
-    Swal.showLoading();
+    try {
+      Swal.showLoading();
 
-    // 🌟 SIMPAN TTD PERMANEN KE DATABASE BACKEND
-    await API.post(`/pemesanan/${bookingResponse?.id}/ttd`, {
-      signature: signatureImage,
-      is_agreed: true
-    });
+      await API.post(`/pemesanan/${bookingResponse?.id}/ttd`, {
+        signature: signatureImage,
+        is_agreed: true
+      });
 
-    Swal.close();
+      Swal.close();
 
-    const dataDikirim = {
-      pemesanan_id: bookingResponse?.id, 
-      property_id: properti.id,
-      kamar_id: selectedKamar ? selectedKamar.id : null,
-      nomorKamar: selectedKamar ? (selectedKamar.nomor_kamar || selectedKamar.nama_kamar) : '-',
-      namaProperti: properti.namaProperti,
-      tipeKamar: properti.kategori,
-      hargaSewa: `${formatRupiah(properti.hargaPerBulan)} / bln`,
-      durasiSewa: `${durasiSewa} Bulan`,
-      tanggalMasuk: new Date(tanggalMasuk).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }),
-      biayaLayanan: formatRupiah(properti.biayaLayanan),
-      totalBayar: formatRupiah(totalPembayaran), 
-      gambar: properti.gambarUtama,
-      signatureImage: signatureImage
-    };
+      const dataDikirim = {
+        pemesanan_id: bookingResponse?.id, 
+        property_id: properti.id,
+        kamar_id: selectedKamar ? selectedKamar.id : null,
+        nomorKamar: selectedKamar ? (selectedKamar.nomor_kamar || selectedKamar.nama_kamar) : '-',
+        namaProperti: properti.namaProperti,
+        tipeKamar: properti.kategori,
+        hargaSewa: `${formatRupiah(properti.hargaPerBulan)} / bln`,
+        durasiSewa: `${durasiSewa} Bulan`,
+        tanggalMasuk: new Date(tanggalMasuk).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }),
+        biayaLayanan: formatRupiah(properti.biayaLayanan),
+        totalBayar: formatRupiah(totalPembayaran), 
+        gambar: properti.gambarUtama,
+        signatureImage: signatureImage
+      };
 
-    setShowDokumenModal(false);
+      setShowDokumenModal(false);
 
-    Swal.fire({
-      icon: 'success',
-      title: 'Tanda Tangan Tersimpan!',
-      text: 'Meneruskan ke halaman pembayaran...',
-      timer: 1200,
-      showConfirmButton: false
-    });
+      Swal.fire({
+        icon: 'success',
+        title: 'Tanda Tangan Tersimpan!',
+        text: 'Meneruskan ke halaman pembayaran...',
+        timer: 1200,
+        showConfirmButton: false
+      });
 
-    setTimeout(() => {
-      navigate('/pembayaran', { state: { itemTransaksi: dataDikirim } });
-    }, 1000);
+      setTimeout(() => {
+        navigate('/pembayaran', { state: { itemTransaksi: dataDikirim } });
+      }, 1000);
 
-  } catch (err) {
-    Swal.fire({
-      icon: 'error',
-      title: 'Gagal Menyimpan TTD',
-      text: err.response?.data?.message || 'Gagal menyimpan tanda tangan ke server.',
-      confirmButtonColor: '#2D2321'
-    });
-  }
-};
+    } catch (err) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Menyimpan TTD',
+        text: err.response?.data?.message || 'Gagal menyimpan tanda tangan ke server.',
+        confirmButtonColor: '#2D2321'
+      });
+    }
+  };
 
   const handleImageError = (e) => {
     e.target.onerror = null;
@@ -528,7 +527,7 @@ export default function DetailKamar() {
         </div>
       )}
 
-      {/* 📜 POP-UP MODAL DOKUMEN SEWA & TTD DIGITAL */}
+      {/* POP-UP MODAL DOKUMEN SEWA & TTD DIGITAL */}
       {showDokumenModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
           <div className="bg-white border border-[#D7C4B0] max-w-2xl w-full rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl relative my-8">
@@ -551,14 +550,12 @@ export default function DetailKamar() {
               </p>
             </div>
 
-            {/* Teks Perjanjian Sewa */}
             <div className="bg-[#FAF5EF] p-4 sm:p-5 rounded-2xl border border-[#D7C4B0] text-xs text-[#2D2321] leading-relaxed max-h-56 overflow-y-auto whitespace-pre-line shadow-inner">
               {bookingResponse?.dokumen_sewa?.lease_agreement || bookingResponse?.dokumenSewa?.lease_agreement || (
                 `SURAT PERJANJIAN SEWA HUNIAN KAFANA\n\nPada hari ini, disepakati perjanjian sewa antara Management Kafana dengan Penyewa.\n\nRincian Sewa:\n- Properti: ${properti.namaProperti}\n- Unit Kamar: ${selectedKamar?.nomor_kamar || '-'}\n- Tanggal Check-In: ${tanggalMasuk}\n- Durasi: ${durasiSewa} Bulan\n- Total Biaya: ${formatRupiah(totalPembayaran)}\n\nDengan menandatangani dokumen ini, Penyewa menyatakan setuju dengan seluruh syarat dan ketentuan yang berlaku.`
               )}
             </div>
 
-            {/* Checkbox Persetujuan */}
             <label className="flex items-start gap-3 cursor-pointer p-1">
               <input 
                 type="checkbox" 
@@ -571,7 +568,6 @@ export default function DetailKamar() {
               </span>
             </label>
 
-            {/* Area Tanda Tangan Digital (Canvas) */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-[#2D2321]">
@@ -608,7 +604,6 @@ export default function DetailKamar() {
               </div>
             </div>
 
-            {/* Tombol Eksekusi Modal */}
             <button
               onClick={handleSelesaiTTDDanLanjutBayar}
               className="w-full py-4 bg-[#2D2321] hover:bg-[#B38E5D] text-white font-bold rounded-2xl text-xs uppercase tracking-widest transition shadow-lg cursor-pointer"
@@ -926,40 +921,51 @@ export default function DetailKamar() {
                 </span>
               </div>
 
-              <form onSubmit={handleSubmitReview} className="bg-[#FAF5EF] p-5 rounded-2xl border border-[#D7C4B0]/80 space-y-3.5 shadow-inner">
-                <p className="text-xs font-bold text-[#2D2321]">Bagikan Pengalaman Kamu Tinggal Di Sini:</p>
-                <div className="flex flex-wrap items-center gap-3">
-                  <label className="text-xs text-gray-600 font-semibold">Beri Rating:</label>
-                  <select 
-                    value={newRating} 
-                    onChange={(e) => setNewRating(Number(e.target.value))}
-                    className="bg-white border border-[#D7C4B0] text-xs font-bold px-3 py-2 rounded-xl cursor-pointer"
+              {/* FORM HANYA MUNCUL JIKA USER SUDAH LOGIN */}
+              {isLoggedIn ? (
+                <form onSubmit={handleSubmitReview} className="bg-[#FAF5EF] p-5 rounded-2xl border border-[#D7C4B0]/80 space-y-3.5 shadow-inner">
+                  <p className="text-xs font-bold text-[#2D2321]">Bagikan Pengalaman Kamu Tinggal Di Sini:</p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="text-xs text-[#5C4A42] font-semibold">Beri Rating:</label>
+                    <select 
+                      value={newRating} 
+                      onChange={(e) => setNewRating(Number(e.target.value))}
+                      className="bg-white border border-[#D7C4B0] text-xs font-bold px-3 py-2 rounded-xl cursor-pointer"
+                    >
+                      <option value={5}>⭐⭐⭐⭐⭐ (5 - Sangat Bagus)</option>
+                      <option value={4}>⭐⭐⭐⭐ (4 - Bagus)</option>
+                      <option value={3}>⭐⭐⭐ (3 - Cukup)</option>
+                      <option value={2}>⭐⭐ (2 - Kurang)</option>
+                      <option value={1}>⭐ (1 - Buruk)</option>
+                    </select>
+                  </div>
+
+                  <textarea
+                    rows="3"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Ceritakan kebersihan, kenyamanan, atau kelebihan kost ini..."
+                    className="w-full bg-white border border-[#D7C4B0] p-3.5 rounded-xl text-xs text-[#2D2321]"
+                  ></textarea>
+
+                  <button
+                    type="submit"
+                    disabled={submittingReview}
+                    className="bg-[#2D2321] hover:bg-[#B38E5D] text-white px-6 py-2.5 rounded-xl text-xs font-bold uppercase cursor-pointer transition"
                   >
-                    <option value={5}>⭐⭐⭐⭐⭐ (5 - Sangat Bagus)</option>
-                    <option value={4}>⭐⭐⭐⭐ (4 - Bagus)</option>
-                    <option value={3}>⭐⭐⭐ (3 - Cukup)</option>
-                    <option value={2}>⭐⭐ (2 - Kurang)</option>
-                    <option value={1}>⭐ (1 - Buruk)</option>
-                  </select>
+                    {submittingReview ? 'Mengirim...' : 'Kirim Ulasan Sekarang'}
+                  </button>
+                </form>
+              ) : (
+                <div className="bg-[#FAF5EF] p-4.5 rounded-2xl border border-[#D7C4B0]/80 text-center space-y-2">
+                  <p className="text-xs text-[#5C4A42] font-medium">
+                    anda hanya bisa menulis ulasan ketika sudah sewa
+                  </p>
+                  
                 </div>
+              )}
 
-                <textarea
-                  rows="3"
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="Ceritakan kebersihan, kenyamanan, atau kelebihan kost ini..."
-                  className="w-full bg-white border border-[#D7C4B0] p-3.5 rounded-xl text-xs text-[#2D2321]"
-                ></textarea>
-
-                <button
-                  type="submit"
-                  disabled={submittingReview}
-                  className="bg-[#2D2321] hover:bg-[#B38E5D] text-white px-6 py-2.5 rounded-xl text-xs font-bold uppercase cursor-pointer transition"
-                >
-                  {submittingReview ? 'Mengirim...' : 'Kirim Ulasan Sekarang'}
-                </button>
-              </form>
-
+              {/* RIWAYAT ULASAN (SELALU TAMPIL) */}
               {loadingReviews ? (
                 <div className="text-center py-6">
                   <div className="w-6 h-6 border-2 border-[#B38E5D] border-t-transparent rounded-full animate-spin mx-auto"></div>

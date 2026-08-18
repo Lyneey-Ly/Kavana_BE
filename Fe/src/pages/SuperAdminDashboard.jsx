@@ -42,6 +42,19 @@ export default function SuperAdminDashboard() {
     foto: null,
   });
 
+  // Helper Formatting Foto Profil / Avatar
+  const formatAvatar = (imgSrc) => {
+    if (!imgSrc) return null;
+    if (imgSrc.startsWith('http://') || imgSrc.startsWith('https://') || imgSrc.startsWith('data:')) {
+      return imgSrc;
+    }
+    const cleanPath = imgSrc.startsWith('/') ? imgSrc : `/${imgSrc}`;
+    if (cleanPath.startsWith('/storage/')) {
+      return `http://127.0.0.1:8000${cleanPath}`;
+    }
+    return `http://127.0.0.1:8000/storage${cleanPath}`;
+  };
+
   // --- FETCHERS ---
   const fetchOverviewStats = useCallback(async () => {
     try {
@@ -355,27 +368,34 @@ export default function SuperAdminDashboard() {
               </div>
             </div>
 
-            {/* Top 5 Properties */}
+            {/* Top 5 Properties (DENGAN NAMA PEMILIK KOST) */}
             <div className="bg-white p-5 rounded-2xl border border-[#D7C4B0]">
               <h3 className="font-bold text-sm mb-4">⭐ Top 5 Properti Kost Terlaris</h3>
               <div className="space-y-3">
-                {platformStats?.top_properties?.map((item, idx) => (
-                  <div key={item.property_id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl text-xs">
-                    <div>
-                      <span className="font-bold mr-2 text-[#B38E5D]">#{idx + 1}</span>
-                      <span className="font-bold">{item.property_name}</span>
-                      <p className="text-slate-400 text-[10px]">{item.bookings} Pemesanan</p>
+                {platformStats?.top_properties?.map((item, idx) => {
+                  const ownerName = item.pemilik_name || item.owner_name || item.admin_name || item.pemilik?.name || 'Pemilik Kost';
+                  return (
+                    <div key={item.property_id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl text-xs">
+                      <div>
+                        <span className="font-bold mr-2 text-[#B38E5D]">#{idx + 1}</span>
+                        <span className="font-bold text-[#261C19]">{item.property_name}</span>
+                        <p className="text-[#5C4A42] text-[11px] font-medium flex items-center gap-1 mt-0.5">
+                          <span>👤 Pemilik:</span>
+                          <span className="font-bold text-[#B38E5D]">{ownerName}</span>
+                        </p>
+                        <p className="text-slate-400 text-[10px] mt-0.5">{item.bookings} Pemesanan</p>
+                      </div>
+                      <span className="font-black text-[#261C19]">{formatRupiah(item.revenue)}</span>
                     </div>
-                    <span className="font-black text-[#261C19]">{formatRupiah(item.revenue)}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* --- TAB 2: DAFTAR PENGELOLA --- */}
+      {/* --- TAB 2: DAFTAR PENGELOLA (PERBAIKAN FOTO PROFIL/PP) --- */}
       {activeTab === 'administrators' && (
         <div className="bg-white rounded-2xl border border-[#D7C4B0] shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 bg-[#FAF5EF]/50 flex justify-between items-center">
@@ -403,40 +423,56 @@ export default function SuperAdminDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {administrators.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50 transition">
-                    <td className="px-6 py-4 flex items-center gap-3">
-                      {item.foto ? (
-                        <img src={`/storage/${item.foto}`} alt="" className="w-8 h-8 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-xs">
-                          {item.name[0]}
+                {administrators.map((item) => {
+                  const avatarUrl = formatAvatar(item.foto || item.avatar || item.foto_profil);
+                  return (
+                    <tr key={item.id} className="hover:bg-slate-50 transition">
+                      <td className="px-6 py-4 flex items-center gap-3">
+                        <div className="relative w-9 h-9 flex-shrink-0">
+                          {avatarUrl ? (
+                            <img
+                              src={avatarUrl}
+                              alt={item.name}
+                              className="w-9 h-9 rounded-full object-cover border border-[#D7C4B0] shadow-xs"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.style.display = 'none';
+                                e.target.nextElementSibling.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <div
+                            className="w-9 h-9 rounded-full bg-[#B38E5D] text-white flex items-center justify-center font-bold text-xs uppercase shadow-xs"
+                            style={{ display: avatarUrl ? 'none' : 'flex' }}
+                          >
+                            {item.name ? item.name[0] : 'U'}
+                          </div>
                         </div>
-                      )}
-                      <div>
-                        <div className="font-bold text-[#261C19]">{item.name}</div>
-                        <div className="text-xs text-slate-500">{item.email}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 font-mono text-xs text-slate-600">{item.phone}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${item.role === 'superadmin' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                        {item.role === 'superadmin' ? 'Superadmin' : 'Pemilik Kost'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-xs text-slate-500">
-                      {new Date(item.created_at).toLocaleDateString('id-ID')}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <button
-                        onClick={() => handleDeleteAdministrator(item.id, item.name)}
-                        className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold border border-rose-200"
-                      >
-                        🗑️ Hapus
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                        <div>
+                          <div className="font-bold text-[#261C19]">{item.name}</div>
+                          <div className="text-xs text-slate-500">{item.email}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 font-mono text-xs text-slate-600">{item.phone}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${item.role === 'superadmin' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {item.role === 'superadmin' ? 'Superadmin' : 'Pemilik Kost'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-xs text-slate-500">
+                        {new Date(item.created_at).toLocaleDateString('id-ID')}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <button
+                          onClick={() => handleDeleteAdministrator(item.id, item.name)}
+                          className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold border border-rose-200"
+                        >
+                          🗑️ Hapus
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

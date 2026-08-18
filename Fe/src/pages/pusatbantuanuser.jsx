@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; 
+import SidebarUser from '../components/sidebaruser'
 
 export default function BantuanUser() {
   const navigate = useNavigate();
@@ -54,6 +55,8 @@ export default function BantuanUser() {
   };
 
   return (
+    <SidebarUser>
+
     <div className="min-h-screen bg-[#FAF5EF] text-[#261C19] font-sans selection:bg-[#B38E5D] selection:text-white flex flex-col justify-between">
       
       {/* ================= NAVBAR ================= */}
@@ -196,5 +199,7 @@ export default function BantuanUser() {
       </footer>
 
     </div>
+        </SidebarUser>
+
   );
 }

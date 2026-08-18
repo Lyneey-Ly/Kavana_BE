@@ -8,9 +8,25 @@ use Illuminate\Support\Facades\Auth;
 
 class TestimoniController extends Controller
 {
-    // Kirim testimoni baru (Customer)
+    // Kirim testimoni baru (Customer) - Hanya 1x per akun
     public function store(Request $request)
     {
+        $userId = Auth::guard('sanctum')->id();
+
+        if (!$userId) {
+            return response()->json([
+                'message' => 'Unauthenticated.'
+            ], 401);
+        }
+
+        // Cek apakah user sudah pernah mengirim testimoni
+        $alreadySubmitted = Testimoni::where('user_id', $userId)->exists();
+        if ($alreadySubmitted) {
+            return response()->json([
+                'message' => 'Anda sudah pernah memberikan testimoni. Setiap akun hanya diperbolehkan memberikan 1 testimoni.'
+            ], 422);
+        }
+
         $request->validate([
             'properti_id' => 'nullable|exists:propertis,id',
             'review'      => 'required|string',
@@ -18,13 +34,12 @@ class TestimoniController extends Controller
         ]);
 
         $testimoni = Testimoni::create([
-            'user_id'     => Auth::guard('sanctum')->id(),
+            'user_id'     => $userId,
             'properti_id' => $request->properti_id ?? null,
             'review'      => $request->review,
             'rating'      => $request->rating,
         ]);
 
-        // 🌟 Load relasi user agar response JSON setelah submit langsung membawa data profil user
         $testimoni->load('user');
 
         return response()->json([
@@ -37,9 +52,6 @@ class TestimoniController extends Controller
     public function index()
     {
         try {
-            // 🟢 PERBAIKAN: Panggil 'user' langsung tanpa membatasi kolom select.
-            // Laravel otomatis menyembunyikan password & remember_token (sesuai $hidden di model User),
-            // tetapi kolom foto/avatar akan IKUT TERAMBIL secara utuh!
             $data = Testimoni::with('user')->latest()->get();
 
             return response()->json(['data' => $data], 200);
