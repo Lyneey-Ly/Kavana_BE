@@ -11,7 +11,7 @@ use App\Models\RiwayatStatusPemesanan;
 use App\Models\FinanceTracker;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB; // 👈 Import DB Facade
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class PemesananController extends Controller
@@ -113,6 +113,90 @@ class PemesananController extends Controller
     }
 
     /**
+     * 🛑 ADMIN: Menolak Pemesanan dengan Mengisikan Alasan Penolakan
+     */
+    public function rejectBooking(Request $request, $id)
+    {
+        $admin = Auth::guard('sanctum')->user();
+
+        if (!$admin) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        // Validasi Alasan Penolakan (Minimal 10 Karakter)
+        $request->validate([
+            'alasan_penolakan' => 'required|string|min:10',
+        ], [
+            'alasan_penolakan.required' => 'Alasan penolakan wajib diisi.',
+            'alasan_penolakan.min'      => 'Alasan penolakan minimal 10 karakter agar informatif bagi calon penghuni.',
+        ]);
+
+        $pemesanan = Pemesanan::with('properti')->find($id);
+
+        if (!$pemesanan) {
+            return response()->json(['message' => 'Data pemesanan tidak ditemukan'], 404);
+        }
+
+        // Proteksi Hak Akses
+        $role = strtolower($admin->role ?? '');
+        $isSuperAdmin = in_array($role, ['superadmin', 'super_admin']);
+
+        if (!$isSuperAdmin && $pemesanan->properti && $pemesanan->properti->pemilik_id !== $admin->id) {
+            return response()->json([
+                'message' => 'Forbidden. Anda tidak memiliki akses untuk menolak pemesanan pada properti ini!'
+            ], 403);
+        }
+
+        if (in_array(strtoupper($pemesanan->status), ['DITOLAK', 'DIKONFIRMASI', 'SELESAI', 'EXPIRED', 'BATAL'])) {
+            return response()->json([
+                'message' => 'Pemesanan ini sudah memiliki status final (' . $pemesanan->status . ') dan tidak dapat diubah lagi.'
+            ], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $pemesanan->status = 'Ditolak';
+            $pemesanan->alasan_penolakan = $request->alasan_penolakan;
+            $pemesanan->rejected_at = Carbon::now();
+            $pemesanan->save();
+
+            // Kembalikan Status Kamar Menjadi Kosong
+            if ($pemesanan->kamar_id) {
+                $kamar = Kamar::find($pemesanan->kamar_id);
+                if ($kamar) {
+                    $kamar->update(['status' => 'kosong']);
+                }
+            }
+
+            // Catat ke Riwayat Perubahan Status
+            RiwayatStatusPemesanan::create([
+                'pemesanan_id' => $pemesanan->id,
+                'new_status'   => 'Ditolak',
+                'changed_at'   => Carbon::now(),
+                'admin_id'     => $admin->id,
+                'catatan'      => $request->alasan_penolakan,
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'status'  => 'Sukses',
+                'message' => 'Pemesanan berhasil ditolak dan alasan penolakan tersimpan.',
+                'data'    => $pemesanan
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Gagal menolak pemesanan: ' . $e->getMessage());
+
+            return response()->json([
+                'message' => 'Terjadi kesalahan pada server saat menolak pemesanan!',
+                'error'   => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * 🔒 ADMIN: Memperbarui Status Pemesanan & Unit Kamar (Akses Terkunci per Pemilik)
      */
     public function updateStatus(Request $request, $id)
@@ -124,7 +208,11 @@ class PemesananController extends Controller
         }
 
         $request->validate([
-            'status' => 'required|in:Tertunda,Diverifikasi,Dikonfirmasi,Ditolak,Selesai,Expired,Batal',
+            'status'           => 'required|in:Tertunda,Diverifikasi,Dikonfirmasi,Ditolak,Selesai,Expired,Batal',
+            'alasan_penolakan' => 'nullable|required_if:status,Ditolak|string|min:10',
+        ], [
+            'alasan_penolakan.required_if' => 'Alasan penolakan wajib diisi jika status diubah menjadi Ditolak.',
+            'alasan_penolakan.min'         => 'Alasan penolakan minimal 10 karakter.',
         ]);
 
         $pemesanan = Pemesanan::with(['properti', 'pembayaran'])->find($id);
@@ -148,6 +236,12 @@ class PemesananController extends Controller
         DB::beginTransaction();
         try {
             $pemesanan->status = $request->status;
+
+            if ($request->status === 'Ditolak') {
+                $pemesanan->alasan_penolakan = $request->alasan_penolakan;
+                $pemesanan->rejected_at = Carbon::now();
+            }
+
             $pemesanan->save();
 
             // ⚡ SINKRONISASI STATUS UNIT KAMAR OTOMATIS
@@ -183,6 +277,7 @@ class PemesananController extends Controller
                 'new_status'   => $request->status,
                 'changed_at'   => Carbon::now(),
                 'admin_id'     => $admin->id,
+                'catatan'      => $request->status === 'Ditolak' ? $request->alasan_penolakan : null,
             ]);
 
             DB::commit();

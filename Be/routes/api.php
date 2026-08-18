@@ -111,6 +111,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard', [DashboardAdminController::class, 'index']);
         Route::get('/profile', [AdminProfileController::class, 'show']);
         Route::post('/profile', [AdminProfileController::class, 'update']);
+        Route::post('/pemesanan/{id}/tolak', [PemesananController::class, 'rejectBooking']);
         
         // Kelola Properti
         Route::get('/properties', [PropertyController::class, 'indexAdmin']);
