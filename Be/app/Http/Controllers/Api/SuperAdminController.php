@@ -215,6 +215,8 @@ class SuperAdminController extends Controller
         ], 200);
     }
 
+
+
     /**
      * 📈 5. STATISTIK PLATFORM LENGKAP
      */
@@ -311,28 +313,28 @@ class SuperAdminController extends Controller
                 ];
             });
 
-        // Top 5 properties by revenue
+        // Top 5 properties by revenue (Menggunakan Eager Loading Relasi Pemilik)
         $topProperties = Pemesanan::query()
-            ->join('propertis', 'pemesanans.properti_id', '=', 'propertis.id')
-            ->join('pembayarans', 'pemesanans.id', '=', 'pembayarans.pemesanan_id')
-            ->where('pemesanans.status', 'Dikonfirmasi')
-            ->whereYear('pemesanans.check_in_date', $year)
+            ->where('status', 'Dikonfirmasi')
+            ->whereYear('check_in_date', $year)
+            ->whereHas('pembayaran')
+            ->with(['properti.pemilik'])
             ->select(
-                'propertis.id',
-                'propertis.title',
-                DB::raw('SUM(pemesanans.total_price) as total_revenue'),
-                DB::raw('COUNT(pemesanans.id) as total_bookings')
+                'properti_id',
+                DB::raw('SUM(total_price) as total_revenue'),
+                DB::raw('COUNT(id) as total_bookings')
             )
-            ->groupBy('propertis.id', 'propertis.title')
+            ->groupBy('properti_id')
             ->orderByDesc('total_revenue')
             ->limit(5)
             ->get()
             ->map(function ($item) {
                 return [
-                    'property_id' => $item->id,
-                    'property_name' => $item->title,
-                    'revenue' => (float)$item->total_revenue,
-                    'bookings' => (int)$item->total_bookings,
+                    'property_id'   => $item->properti_id,
+                    'property_name' => $item->properti?->title ?? 'Properti Tidak Ditemukan',
+                    'pemilik_name'  => $item->properti?->pemilik?->name ?? 'Pemilik Kost',
+                    'revenue'       => (float)$item->total_revenue,
+                    'bookings'      => (int)$item->total_bookings,
                 ];
             });
 
@@ -354,6 +356,11 @@ class SuperAdminController extends Controller
             ]
         ], 200);
     }
+
+
+
+
+
 
     /**
      * 🧾 6. SEMUA TRANSAKSI (SUPERADMIN VIEW)

@@ -361,7 +361,7 @@ export default function HomeUser() {
                       </p>
                     </div>
                     <button className="px-5 py-2.5 bg-[#FAF5EF] hover:bg-[#261C19] text-[#261C19] hover:text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all border border-[#D7C4B0] shadow-sm">
-                      Detail
+                      Detailll
                     </button>
                   </div>
                 </div>

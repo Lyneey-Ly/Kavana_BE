@@ -54,7 +54,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/users/{id}', [SuperAdminController::class, 'destroyUser']);
         Route::get('/admin-revenue', [SuperAdminController::class, 'adminRevenue']);
         Route::get('/transactions', [SuperAdminController::class, 'allTransactions']);
-        Route::get('/admin-list', [SuperAdminController::class, 'getAdminList']);
+        Route::get('/admin-list', [SuperAdminController::class, 'adminList']); // 💡 Sudah diperbaiki dari getAdminList ke adminList
     });
 
     // --- AUTH & PROFILE ---
@@ -97,11 +97,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/dokumen-sewa', [DokumenSewaController::class, 'indexUser']);
     Route::post('/pemesanan/{id}/ttd', [PemesananController::class, 'saveSignature']);
 
-    // --- 💬 CHAT SYSTEM (UPDATED) ---
+    // --- 💬 CHAT SYSTEM ---
     Route::post('/chat/direct', [ChatController::class, 'sendDirectMessage']);
     Route::get('/chat/direct/{receiverId}', [ChatController::class, 'getDirectMessages']);
-    Route::get('/chat/my-active-properties', [ChatController::class, 'getMyActiveProperties']); // 🆕 Ambil semua properti aktif tenant
-    Route::get('/chat/managed-properties', [ChatController::class, 'getManagedPropertiesChat']); // 🆕 Monitoring roomchat milik Admin/Owner
+    Route::get('/chat/my-active-properties', [ChatController::class, 'getMyActiveProperties']);
+    Route::get('/chat/managed-properties', [ChatController::class, 'getManagedPropertiesChat']);
     Route::post('/chat/group', [ChatController::class, 'sendGroupMessage']);
     Route::get('/chat/group/{propertiId}', [ChatController::class, 'getGroupMessages']);
 
@@ -121,7 +121,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/properties/{propertyId}/rooms', [RoomController::class, 'index']);
         Route::post('/properties/{propertyId}/rooms', [RoomController::class, 'store']);
         Route::put('/rooms/{id}', [RoomController::class, 'update']);
-        Route::post('/properties/{id}', [PropertyController::class, 'update']); // Untuk multipart FormData
+        Route::post('/properties/{id}', [PropertyController::class, 'update']);
         Route::delete('/rooms/{id}', [RoomController::class, 'destroy']);
 
         // Kelola Transaksi & Laporan
