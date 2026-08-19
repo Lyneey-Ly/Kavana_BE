@@ -36,7 +36,6 @@ Route::get('/properties/{propertiId}/reviews', [ReviewController::class, 'getByP
 Route::get('/testimonis', [TestimoniController::class, 'index']);
 Route::post('/auth/google', [AuthController::class, 'googleLogin']);
 
-
 /*
 |--------------------------------------------------------------------------
 | ROUTE PROTECTED (Wajib Bearer Token)
@@ -44,32 +43,18 @@ Route::post('/auth/google', [AuthController::class, 'googleLogin']);
 */
 Route::middleware('auth:sanctum')->group(function () {
 
-<<<<<<< HEAD
     // --- AUTH & PROFILE USER ---
-=======
-    // --- 👑 SUPERADMIN ROUTES ---
-    Route::prefix('superadmin')->group(function () {
-        Route::get('/stats', [SuperAdminController::class, 'dashboardStats']);
-        Route::get('/platform-stats', [SuperAdminController::class, 'platformStats']);
-        Route::get('/administrators', [SuperAdminController::class, 'getAdministrators']);
-        Route::post('/administrators', [SuperAdminController::class, 'storeAdministrator']);
-        Route::delete('/administrators/{id}', [SuperAdminController::class, 'destroyAdministrator']);
-        Route::get('/users', [SuperAdminController::class, 'getUsers']);
-        Route::delete('/users/{id}', [SuperAdminController::class, 'destroyUser']);
-        Route::get('/admin-revenue', [SuperAdminController::class, 'adminRevenue']);
-        Route::get('/transactions', [SuperAdminController::class, 'allTransactions']);
-        Route::get('/admin-list', [SuperAdminController::class, 'adminList']);
-    });
-
-    // --- AUTH & PROFILE ---
->>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::post('/profile/update', [ProfileController::class, 'update']);
 
+    // --- PENGATURAN PEMBAYARAN (DAPAT DIBACA USER & ADMIN) ---
+    Route::get('/payment-settings', [AdminProfileController::class, 'getPaymentSettings']);
+
     // --- CUSTOMER & SEWA ---
     Route::post('/pemesanan/booking', [PemesananController::class, 'booking']);
     Route::get('/pemesanan/riwayat', [PemesananController::class, 'riwayatCustomer']);
+    Route::get('/pemesanan/{id}/payment-instruction', [PembayaranController::class, 'getPaymentInstruction']);
     Route::get('/my-active-rental', [PemesananController::class, 'getActiveRental']);
     Route::get('/customer/notifikasi-kontrak', [PemesananController::class, 'cekNotifikasiKontrak']);
     
@@ -82,7 +67,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/complaints', [ComplaintController::class, 'store']);
     Route::get('/my-complaints', [ComplaintController::class, 'myComplaints']);
 
-    // --- NOTIFIKASI (GLOBAL: Customer & Admin) ---
+    // --- NOTIFIKASI (GLOBAL) ---
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::patch('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
@@ -103,11 +88,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/dokumen-sewa', [DokumenSewaController::class, 'indexUser']);
     Route::post('/pemesanan/{id}/ttd', [PemesananController::class, 'saveSignature']);
 
-<<<<<<< HEAD
     // --- CHAT SYSTEM ---
-=======
-    // --- 💬 CHAT SYSTEM (SELARAS DENGAN ADMINROOMCHAT.JSX) ---
->>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
     Route::post('/chat/direct', [ChatController::class, 'sendDirectMessage']);
     Route::get('/chat/direct/{receiverId}', [ChatController::class, 'getDirectMessages']);
     Route::get('/chat/my-active-properties', [ChatController::class, 'getMyActiveProperties']);
@@ -122,14 +103,22 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard', [DashboardAdminController::class, 'index']);
         Route::get('/profile', [AdminProfileController::class, 'show']);
         Route::post('/profile', [AdminProfileController::class, 'update']);
-        Route::post('/pemesanan/{id}/tolak', [PemesananController::class, 'rejectBooking']);
+        
+        // Simpan / Update Pengaturan Pembayaran (Hanya Admin)
+        Route::get('/payment-settings', [AdminProfileController::class, 'getPaymentSettings']);
+        Route::post('/payment-settings', [AdminProfileController::class, 'updatePaymentSettings']);
         
         // Kelola Properti
         Route::get('/properties', [PropertyController::class, 'indexAdmin']);
+        Route::get('/properties/{id}', [PropertyController::class, 'show']);
         Route::post('/properties', [PropertyController::class, 'store']);
         Route::put('/properties/{id}', [PropertyController::class, 'update']);
-        Route::post('/properties/{id}', [PropertyController::class, 'update']); // Untuk upload multipart/form-data
+        Route::post('/properties/{id}', [PropertyController::class, 'update']);
         Route::delete('/properties/{id}', [PropertyController::class, 'destroy']);
+
+        // Monetisasi Publikasi Properti Admin
+        Route::post('/properties/{id}/pay-gateway', [PembayaranController::class, 'payGateway']);
+        Route::post('/properties/{id}/upload-proof', [PembayaranController::class, 'uploadProof']);
 
         // Kelola Kamar
         Route::get('/properties/{propertyId}/rooms', [RoomController::class, 'index']);
@@ -137,10 +126,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/rooms/{id}', [RoomController::class, 'update']);
         Route::delete('/rooms/{id}', [RoomController::class, 'destroy']);
 
-        // Kelola Transaksi, Laporan, & Dokumen Sewa
+        // Kelola Transaksi & Laporan
         Route::post('/pemesanan/{id}/status', [PemesananController::class, 'updateStatus']);
         Route::post('/pembayaran/{id}/konfirmasi', [PembayaranController::class, 'konfirmasi']);
+        
         Route::get('/finance/laporan', [FinanceController::class, 'laporanGlobal']);
+        Route::post('/finance/pengeluaran', [FinanceController::class, 'storePengeluaran']);
+        Route::delete('/finance/pengeluaran/{id}', [FinanceController::class, 'destroyPengeluaran']);
+
         Route::get('/dokumen-sewa', [DokumenSewaController::class, 'indexAdmin']);
         Route::put('/dokumen-sewa/{id}', [DokumenSewaController::class, 'update']);
         Route::get('/complaints', [ComplaintController::class, 'indexAdmin']);
@@ -148,7 +141,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/penyewa-aktif', [DashboardAdminController::class, 'penyewaAktif']);
         Route::get('/tagihan-order', [PembayaranController::class, 'indexTagihanOrder']);
 
-        // Kelola SuperAdmin Akses (Diproteksi Middleware Admin)
+        // Kelola SuperAdmin Akses
         Route::prefix('superadmin')->group(function () {
             Route::get('/stats', [SuperAdminController::class, 'dashboardStats']);
             Route::get('/platform-stats', [SuperAdminController::class, 'platformStats']);
@@ -160,6 +153,10 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/admin-revenue', [SuperAdminController::class, 'adminRevenue']);
             Route::get('/transactions', [SuperAdminController::class, 'allTransactions']);
             Route::get('/admin-list', [SuperAdminController::class, 'adminList']);
+            
+            // --- VERIFIKASI & MONETISASI PROPERTI (SUPERADMIN) ---
+            Route::get('/pending-properties', [SuperAdminController::class, 'getPendingProperties']);
+            Route::patch('/properties/{id}/approval', [SuperAdminController::class, 'updatePropertyApproval']);
         });
     });
 });

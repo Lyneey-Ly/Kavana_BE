@@ -15,11 +15,16 @@ class Administrator extends Authenticatable
     protected $table = 'administrators'; 
 
     protected $fillable = [
-        'name',
-        'email',
-        'phone', 
-        'password',
-        'role', 
+       'name',
+    'email',
+    'phone',
+    'password',
+    'role',
+    'foto',
+    'bank_name',
+    'account_number',
+    'account_holder',
+    'qris_image',
     ];
 
     protected $hidden = [

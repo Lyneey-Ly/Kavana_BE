@@ -1,10 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import API from '../api';
 import Swal from 'sweetalert2';
+import SidebarSuperAdmin from '../components/SidebarSuperAdmin';
 
 export default function SuperAdminDashboard() {
-  // --- STATES ---
-  const [activeTab, setActiveTab] = useState('analytics'); // analytics | administrators | users | revenue | transactions
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Membaca tab aktif dari URL Query Parameter
+  const searchParams = new URLSearchParams(location.search);
+  const activeTab = searchParams.get('tab') || 'overview';
+
   const [loading, setLoading] = useState(true);
 
   // Stats & Main Data
@@ -13,6 +20,10 @@ export default function SuperAdminDashboard() {
   const [administrators, setAdministrators] = useState([]);
   const [adminRoleFilter, setAdminRoleFilter] = useState('');
   const [users, setUsers] = useState([]);
+
+  // Monetization / Approval Properties
+  const [pendingProperties, setPendingProperties] = useState([]);
+  const [approvalFilter, setApprovalFilter] = useState('pending_payment');
 
   // Revenue State
   const [revenueData, setRevenueData] = useState(null);
@@ -31,7 +42,7 @@ export default function SuperAdminDashboard() {
     page: 1,
   });
 
-  // Modal & Form State
+  // Modal State
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -42,7 +53,6 @@ export default function SuperAdminDashboard() {
     foto: null,
   });
 
-  // Helper Formatting Foto Profil / Avatar
   const formatAvatar = (imgSrc) => {
     if (!imgSrc) return null;
     if (imgSrc.startsWith('http://') || imgSrc.startsWith('https://') || imgSrc.startsWith('data:')) {
@@ -54,6 +64,9 @@ export default function SuperAdminDashboard() {
     }
     return `http://127.0.0.1:8000/storage${cleanPath}`;
   };
+
+  const formatRupiah = (val) =>
+    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val || 0);
 
   // --- FETCHERS ---
   const fetchOverviewStats = useCallback(async () => {
@@ -73,6 +86,15 @@ export default function SuperAdminDashboard() {
       console.error('Gagal memuat statistik platform', err);
     }
   }, [selectedYear]);
+
+  const fetchPendingProperties = useCallback(async () => {
+    try {
+      const res = await API.get(`/admin/superadmin/pending-properties?approval_status=${approvalFilter}`);
+      setPendingProperties(res.data.data);
+    } catch (err) {
+      console.error('Gagal memuat properti pending', err);
+    }
+  }, [approvalFilter]);
 
   const fetchAdministrators = useCallback(async () => {
     try {
@@ -137,20 +159,47 @@ export default function SuperAdminDashboard() {
     Promise.all([
       fetchOverviewStats(),
       fetchPlatformStats(),
+      fetchPendingProperties(),
       fetchAdministrators(),
       fetchUsers(),
       fetchRevenueData(),
       fetchTransactions(),
       fetchAdminList(),
     ]).finally(() => setLoading(false));
-  }, [fetchOverviewStats, fetchPlatformStats, fetchAdministrators, fetchUsers, fetchRevenueData, fetchTransactions, fetchAdminList]);
+  }, [fetchOverviewStats, fetchPlatformStats, fetchPendingProperties, fetchAdministrators, fetchUsers, fetchRevenueData, fetchTransactions, fetchAdminList]);
 
-  // Refetch on Filter Changes
+  // Refetch based on Filters
   useEffect(() => { fetchAdministrators(); }, [fetchAdministrators]);
+  useEffect(() => { fetchPendingProperties(); }, [fetchPendingProperties]);
   useEffect(() => { fetchPlatformStats(); fetchRevenueData(); }, [fetchPlatformStats, fetchRevenueData, selectedYear]);
   useEffect(() => { fetchTransactions(); }, [fetchTransactions, txFilters]);
 
   // --- HANDLERS ---
+  const handleApprovalChange = async (propertyId, newStatus) => {
+    const actionText = newStatus === 'active' ? 'Setujui & Terbitkan' : 'Tolak';
+    const result = await Swal.fire({
+      title: `${actionText} Properti?`,
+      text: `Status persetujuan properti akan diubah menjadi '${newStatus}'.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: newStatus === 'active' ? '#B38E5D' : '#d33',
+      confirmButtonText: `Ya, ${actionText}!`,
+      cancelButtonText: 'Batal'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await API.patch(`/admin/superadmin/properties/${propertyId}/approval`, {
+          approval_status: newStatus
+        });
+        Swal.fire('Berhasil!', `Status properti telah diperbarui.`, 'success');
+        fetchPendingProperties();
+      } catch (err) {
+        Swal.fire('Gagal!', err.response?.data?.message || 'Gagal mengubah status', 'error');
+      }
+    }
+  };
+
   const handleInputChange = (e) => {
     const { name, value, files } = e.target;
     if (name === 'foto') {
@@ -204,9 +253,7 @@ export default function SuperAdminDashboard() {
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
-      cancelButtonColor: '#6e7881',
       confirmButtonText: 'Ya, Hapus!',
-      cancelButtonText: 'Batal',
     });
 
     if (result.isConfirmed) {
@@ -228,7 +275,6 @@ export default function SuperAdminDashboard() {
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
-      cancelButtonColor: '#6e7881',
       confirmButtonText: 'Ya, Hapus User!',
     });
 
@@ -244,445 +290,516 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const formatRupiah = (val) =>
-    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val || 0);
-
   return (
-    <div className="p-6 lg:p-8 w-full text-[#261C19] font-sans min-h-screen bg-[#FAF5EF]">
-      {/* HEADER SECTION */}
-      <header className="mb-8 bg-white p-6 rounded-2xl border border-[#D7C4B0] shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <span className="text-xs font-bold text-[#B38E5D] uppercase tracking-widest block mb-1">
-            Control Panel
-          </span>
-          <h1 className="text-3xl font-bold font-serif tracking-tight text-[#261C19]">
-            Dashboard Superadmin
-          </h1>
-          <p className="text-[#5C4A42] text-sm mt-1">
-            Monitoring seluruh pengguna, statistik platform, omzet pemilik kost, dan transaksi.
-          </p>
-        </div>
+    <div className="flex min-h-screen bg-[#FAF5EF]">
+      {/* SIDEBAR */}
+      <SidebarSuperAdmin/>
 
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-[#B38E5D] hover:bg-[#8F6E45] text-white px-5 py-3 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all shadow-md hover:scale-105 cursor-pointer flex items-center justify-center gap-2 self-start md:self-auto"
-        >
-          <span>➕</span> Tambah Pengelola Baru
-        </button>
-      </header>
-
-      {/* STATISTIC CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-5 rounded-2xl border border-[#D7C4B0] shadow-sm flex items-center justify-between">
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 p-6 lg:p-8 text-[#261C19] font-sans overflow-y-auto">
+        {/* HEADER SECTION */}
+        <header className="mb-8 bg-white p-6 rounded-2xl border border-[#D7C4B0] shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Pencari Kost</p>
-            <h3 className="text-2xl font-black text-[#261C19]">{stats.total_users}</h3>
+            <span className="text-xs font-bold text-[#B38E5D] uppercase tracking-widest block mb-1">
+              Superadmin Control Center
+            </span>
+            <h1 className="text-2xl lg:text-3xl font-bold font-serif tracking-tight text-[#261C19]">
+              {activeTab === 'overview' && 'Dashboard Analitik Platform'}
+              {activeTab === 'approval' && 'Persetujuan & Monetisasi Properti'}
+              {activeTab === 'administrators' && 'Kelola Pengelola & Pemilik Kost'}
+              {activeTab === 'users' && 'Monitoring Pengguna Platform'}
+              {activeTab === 'revenue' && 'Laporan Pendapatan Pemilik Kost'}
+              {activeTab === 'transactions' && 'Semua Riwayat Transaksi'}
+            </h1>
+            <p className="text-[#5C4A42] text-xs lg:text-sm mt-1">
+              Kelola sistem terpusat, monetisasi slot properti, dan pantau aktivitas platform secara realtime.
+            </p>
           </div>
-          <div className="w-10 h-10 bg-[#FAF5EF] rounded-xl flex items-center justify-center text-xl border border-[#D7C4B0]/50">👥</div>
-        </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-[#D7C4B0] shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Pemilik Kost</p>
-            <h3 className="text-2xl font-black text-[#261C19]">{stats.total_pemilik}</h3>
-          </div>
-          <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-xl border border-emerald-200">🏢</div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-[#D7C4B0] shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Okupansi Kamar</p>
-            <h3 className="text-2xl font-black text-[#261C19]">
-              {platformStats?.property_stats?.occupancy_rate || 0}%
-            </h3>
-          </div>
-          <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-xl border border-blue-200">🛏️</div>
-        </div>
-
-        <div className="bg-[#261C19] text-white p-5 rounded-2xl border border-[#3D2D29] shadow-lg flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-[#D7C4B0] uppercase tracking-wider mb-1">Superadmin</p>
-            <h3 className="text-2xl font-black text-[#FAF5EF]">{stats.total_superadmin}</h3>
-          </div>
-          <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-xl border border-white/20">🛡️</div>
-        </div>
-      </div>
-
-      {/* TAB NAVIGATION */}
-      <div className="flex overflow-x-auto border-b border-[#D7C4B0] mb-6 gap-2">
-        {[
-          { id: 'analytics', label: '📊 Analitik Platform' },
-          { id: 'administrators', label: `📋 Pengelola (${administrators.length})` },
-          { id: 'users', label: `📱 User (${users.length})` },
-          { id: 'revenue', label: '💰 Pendapatan Pemilik' },
-          { id: 'transactions', label: '🧾 Semua Transaksi' },
-        ].map((tab) => (
           <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`pb-3 px-4 font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all border-b-2 cursor-pointer ${
-              activeTab === tab.id
-                ? 'border-[#B38E5D] text-[#B38E5D]'
-                : 'border-transparent text-slate-500 hover:text-[#261C19]'
-            }`}
+            onClick={() => setShowModal(true)}
+            className="bg-[#B38E5D] hover:bg-[#8F6E45] text-white px-5 py-3 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all shadow-md hover:scale-105 cursor-pointer flex items-center justify-center gap-2 self-start md:self-auto"
           >
-            {tab.label}
+            <span>➕</span> Tambah Pengelola Baru
           </button>
-        ))}
-      </div>
+        </header>
 
-      {/* --- TAB 1: ANALITIK PLATFORM --- */}
-      {activeTab === 'analytics' && (
-        <div className="space-y-6">
-          <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-[#D7C4B0]">
-            <h2 className="font-bold text-[#261C19]">Performa Platform</h2>
-            <div className="flex items-center gap-2 text-xs font-bold">
-              <span>Tahun:</span>
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
-                className="border border-[#D7C4B0] p-1.5 rounded-lg bg-[#FAF5EF]"
-              >
-                {[2024, 2025, 2026].map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
+        {/* OVERVIEW STATS CARDS */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white p-5 rounded-2xl border border-[#D7C4B0] shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Pencari Kost</p>
+              <h3 className="text-2xl font-black text-[#261C19]">{stats.total_users}</h3>
             </div>
+            <div className="w-10 h-10 bg-[#FAF5EF] rounded-xl flex items-center justify-center text-xl border border-[#D7C4B0]/50">👥</div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Top 5 Admins */}
-            <div className="bg-white p-5 rounded-2xl border border-[#D7C4B0]">
-              <h3 className="font-bold text-sm mb-4">🏆 Top 5 Pemilik Kost (Omzet)</h3>
-              <div className="space-y-3">
-                {platformStats?.top_admins?.map((item, idx) => (
-                  <div key={item.admin_id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl text-xs">
-                    <div>
-                      <span className="font-bold mr-2 text-[#B38E5D]">#{idx + 1}</span>
-                      <span className="font-bold">{item.admin_name}</span>
-                      <p className="text-slate-400 text-[10px]">{item.bookings} Booking</p>
-                    </div>
-                    <span className="font-black text-[#261C19]">{formatRupiah(item.revenue)}</span>
-                  </div>
-                ))}
+          <div className="bg-white p-5 rounded-2xl border border-[#D7C4B0] shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Pemilik Kost</p>
+              <h3 className="text-2xl font-black text-[#261C19]">{stats.total_pemilik}</h3>
+            </div>
+            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-xl border border-emerald-200">🏢</div>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-[#D7C4B0] shadow-sm flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Okupansi Kamar</p>
+              <h3 className="text-2xl font-black text-[#261C19]">
+                {platformStats?.property_stats?.occupancy_rate || 0}%
+              </h3>
+            </div>
+            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-xl border border-blue-200">🛏️</div>
+          </div>
+
+          <div className="bg-[#261C19] text-white p-5 rounded-2xl border border-[#3D2D29] shadow-lg flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-[#D7C4B0] uppercase tracking-wider mb-1">Superadmin</p>
+              <h3 className="text-2xl font-black text-[#FAF5EF]">{stats.total_superadmin}</h3>
+            </div>
+            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-xl border border-white/20">🛡️</div>
+          </div>
+        </div>
+
+        {/* --- DYNAMIC TAB / PAGE RENDERING --- */}
+
+        {/* TAB 1: OVERVIEW & ANALYTICS */}
+        {activeTab === 'overview' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-[#D7C4B0]">
+              <h2 className="font-bold text-[#261C19]">Performa Platform</h2>
+              <div className="flex items-center gap-2 text-xs font-bold">
+                <span>Tahun:</span>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="border border-[#D7C4B0] p-1.5 rounded-lg bg-[#FAF5EF]"
+                >
+                  {[2024, 2025, 2026].map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {/* Top 5 Properties (DENGAN NAMA PEMILIK KOST) */}
-            <div className="bg-white p-5 rounded-2xl border border-[#D7C4B0]">
-              <h3 className="font-bold text-sm mb-4">⭐ Top 5 Properti Kost Terlaris</h3>
-              <div className="space-y-3">
-                {platformStats?.top_properties?.map((item, idx) => {
-                  const ownerName = item.pemilik_name || item.owner_name || item.admin_name || item.pemilik?.name || 'Pemilik Kost';
-                  return (
-                    <div key={item.property_id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Top 5 Admins */}
+              <div className="bg-white p-5 rounded-2xl border border-[#D7C4B0]">
+                <h3 className="font-bold text-sm mb-4">🏆 Top 5 Pemilik Kost (Omzet)</h3>
+                <div className="space-y-3">
+                  {platformStats?.top_admins?.map((item, idx) => (
+                    <div key={item.admin_id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl text-xs">
                       <div>
                         <span className="font-bold mr-2 text-[#B38E5D]">#{idx + 1}</span>
-                        <span className="font-bold text-[#261C19]">{item.property_name}</span>
-                        <p className="text-[#5C4A42] text-[11px] font-medium flex items-center gap-1 mt-0.5">
-                          <span>👤 Pemilik:</span>
-                          <span className="font-bold text-[#B38E5D]">{ownerName}</span>
-                        </p>
-                        <p className="text-slate-400 text-[10px] mt-0.5">{item.bookings} Pemesanan</p>
+                        <span className="font-bold">{item.admin_name}</span>
+                        <p className="text-slate-400 text-[10px]">{item.bookings} Booking</p>
                       </div>
                       <span className="font-black text-[#261C19]">{formatRupiah(item.revenue)}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- TAB 2: DAFTAR PENGELOLA (PERBAIKAN FOTO PROFIL/PP) --- */}
-      {activeTab === 'administrators' && (
-        <div className="bg-white rounded-2xl border border-[#D7C4B0] shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 bg-[#FAF5EF]/50 flex justify-between items-center">
-            <h2 className="font-bold text-[#261C19] text-base">Akun Administrator & Pemilik Kost</h2>
-            <select
-              value={adminRoleFilter}
-              onChange={(e) => setAdminRoleFilter(e.target.value)}
-              className="text-xs border border-[#D7C4B0] p-2 rounded-lg bg-white"
-            >
-              <option value="">Semua Role</option>
-              <option value="admin">Pemilik Kost (Admin)</option>
-              <option value="superadmin">Superadmin</option>
-            </select>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100 uppercase text-[11px]">
-                <tr>
-                  <th className="px-6 py-3.5">Pengelola</th>
-                  <th className="px-6 py-3.5">Kontak</th>
-                  <th className="px-6 py-3.5">Role</th>
-                  <th className="px-6 py-3.5">Terdaftar</th>
-                  <th className="px-6 py-3.5 text-center">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {administrators.map((item) => {
-                  const avatarUrl = formatAvatar(item.foto || item.avatar || item.foto_profil);
-                  return (
-                    <tr key={item.id} className="hover:bg-slate-50 transition">
-                      <td className="px-6 py-4 flex items-center gap-3">
-                        <div className="relative w-9 h-9 flex-shrink-0">
-                          {avatarUrl ? (
-                            <img
-                              src={avatarUrl}
-                              alt={item.name}
-                              className="w-9 h-9 rounded-full object-cover border border-[#D7C4B0] shadow-xs"
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.style.display = 'none';
-                                e.target.nextElementSibling.style.display = 'flex';
-                              }}
-                            />
-                          ) : null}
-                          <div
-                            className="w-9 h-9 rounded-full bg-[#B38E5D] text-white flex items-center justify-center font-bold text-xs uppercase shadow-xs"
-                            style={{ display: avatarUrl ? 'none' : 'flex' }}
-                          >
-                            {item.name ? item.name[0] : 'U'}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="font-bold text-[#261C19]">{item.name}</div>
-                          <div className="text-xs text-slate-500">{item.email}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 font-mono text-xs text-slate-600">{item.phone}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${item.role === 'superadmin' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                          {item.role === 'superadmin' ? 'Superadmin' : 'Pemilik Kost'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-xs text-slate-500">
-                        {new Date(item.created_at).toLocaleDateString('id-ID')}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => handleDeleteAdministrator(item.id, item.name)}
-                          className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold border border-rose-200"
-                        >
-                          🗑️ Hapus
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* --- TAB 3: USER TERDAFTAR --- */}
-      {activeTab === 'users' && (
-        <div className="bg-white rounded-2xl border border-[#D7C4B0] shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 bg-[#FAF5EF]/50 flex justify-between items-center">
-            <h2 className="font-bold text-[#261C19] text-base">Daftar Pengguna Website</h2>
-            <span className="text-xs text-slate-500 font-bold uppercase">Total: {users.length}</span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100 uppercase text-[11px]">
-                <tr>
-                  <th className="px-6 py-3.5">ID</th>
-                  <th className="px-6 py-3.5">Nama Lengkap</th>
-                  <th className="px-6 py-3.5">Email</th>
-                  <th className="px-6 py-3.5">Tanggal Bergabung</th>
-                  <th className="px-6 py-3.5 text-center">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {users.map((user) => (
-                  <tr key={user.id} className="hover:bg-slate-50 transition">
-                    <td className="px-6 py-4 text-xs font-mono font-bold text-slate-400">#{user.id}</td>
-                    <td className="px-6 py-4 font-bold text-[#261C19]">{user.name}</td>
-                    <td className="px-6 py-4 text-slate-600">{user.email}</td>
-                    <td className="px-6 py-4 text-xs text-slate-500">
-                      {new Date(user.created_at).toLocaleDateString('id-ID')}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <button
-                        onClick={() => handleDeleteUser(user.id, user.name)}
-                        className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold border border-rose-200"
-                      >
-                        🗑️ Hapus User
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* --- TAB 4: PENDAPATAN PEMILIK --- */}
-      {activeTab === 'revenue' && (
-        <div className="bg-white rounded-2xl border border-[#D7C4B0] p-6 shadow-sm">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="font-bold text-[#261C19]">Ringkasan Pendapatan Pemilik Kost ({selectedYear})</h2>
-            <div className="text-right">
-              <span className="text-xs text-slate-500 block">Total Pendapatan Platform:</span>
-              <span className="text-xl font-black text-[#B38E5D]">
-                {formatRupiah(revenueData?.summary?.total_platform_revenue)}
-              </span>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {revenueData?.admins?.map((admin) => (
-              <div key={admin.admin_id} className="border border-[#D7C4B0] p-4 rounded-xl bg-[#FAF5EF]/30">
-                <div className="flex justify-between items-center mb-3">
-                  <div>
-                    <h3 className="font-bold text-[#261C19]">{admin.admin_name}</h3>
-                    <p className="text-xs text-slate-500">{admin.admin_email}</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-bold text-emerald-600 block">{admin.yearly_bookings} Booking</span>
-                    <span className="font-extrabold text-[#261C19]">{formatRupiah(admin.yearly_total)}</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-xs">
-                  {admin.monthly_revenue.map((m) => (
-                    <div key={m.month} className="bg-white p-2 rounded-lg border border-slate-200 text-center">
-                      <span className="block text-slate-400 font-bold">{m.month_name}</span>
-                      <span className="font-bold text-slate-700 block">{formatRupiah(m.revenue)}</span>
-                      <span className="text-[10px] text-slate-400">{m.bookings} transaksi</span>
                     </div>
                   ))}
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* --- TAB 5: SEMUA TRANSAKSI --- */}
-      {activeTab === 'transactions' && (
-        <div className="bg-white rounded-2xl border border-[#D7C4B0] shadow-sm overflow-hidden">
-          {/* Filters Bar */}
-          <div className="p-4 border-b border-slate-100 bg-[#FAF5EF]/50 grid grid-cols-1 md:grid-cols-4 gap-3">
-            <input
-              type="text"
-              placeholder="Cari Customer / Properti..."
-              value={txFilters.search}
-              onChange={(e) => setTxFilters({ ...txFilters, search: e.target.value, page: 1 })}
-              className="text-xs border border-[#D7C4B0] p-2 rounded-lg bg-white"
-            />
-
-            <select
-              value={txFilters.status}
-              onChange={(e) => setTxFilters({ ...txFilters, status: e.target.value, page: 1 })}
-              className="text-xs border border-[#D7C4B0] p-2 rounded-lg bg-white"
-            >
-              <option value="semua">Semua Status</option>
-              <option value="Menunggu Konfirmasi">Menunggu Konfirmasi</option>
-              <option value="Dikonfirmasi">Dikonfirmasi</option>
-              <option value="Dibatalkan">Dibatalkan</option>
-            </select>
-
-            <select
-              value={txFilters.admin_id}
-              onChange={(e) => setTxFilters({ ...txFilters, admin_id: e.target.value, page: 1 })}
-              className="text-xs border border-[#D7C4B0] p-2 rounded-lg bg-white"
-            >
-              <option value="">Semua Pemilik Kost</option>
-              {adminList.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
-
-            <select
-              value={txFilters.month}
-              onChange={(e) => setTxFilters({ ...txFilters, month: e.target.value, page: 1 })}
-              className="text-xs border border-[#D7C4B0] p-2 rounded-lg bg-white"
-            >
-              <option value="">Semua Bulan</option>
-              {Array.from({ length: 12 }, (_, i) => (
-                <option key={i + 1} value={i + 1}>
-                  Bulan {i + 1}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Transactions Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100 uppercase text-[11px]">
-                <tr>
-                  <th className="px-6 py-3.5">ID / Tanggal</th>
-                  <th className="px-6 py-3.5">Penyewa</th>
-                  <th className="px-6 py-3.5">Properti & Kamar</th>
-                  <th className="px-6 py-3.5">Pemilik Kost</th>
-                  <th className="px-6 py-3.5">Total Harga</th>
-                  <th className="px-6 py-3.5">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {transactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-slate-50 transition text-xs">
-                    <td className="px-6 py-4">
-                      <div className="font-bold">#{tx.id}</div>
-                      <div className="text-slate-400">{tx.booking_date}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-bold">{tx.customer?.name || '-'}</div>
-                      <div className="text-slate-400">{tx.customer?.email}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-[#261C19]">{tx.properti?.title || '-'}</div>
-                      <div className="text-slate-400">Kamar: {tx.kamar?.nomor_kamar || '-'}</div>
-                    </td>
-                    <td className="px-6 py-4 font-bold">{tx.properti?.pemilik?.name || '-'}</td>
-                    <td className="px-6 py-4 font-black text-[#261C19]">{formatRupiah(tx.total_price)}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                        tx.status === 'Dikonfirmasi' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                      }`}>
-                        {tx.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          <div className="p-4 border-t border-slate-100 flex justify-between items-center text-xs">
-            <span>
-              Menampilkan {transactions.length} dari {pagination.total || 0} transaksi
-            </span>
-            <div className="flex gap-2">
-              <button
-                disabled={txFilters.page === 1}
-                onClick={() => setTxFilters({ ...txFilters, page: txFilters.page - 1 })}
-                className="px-3 py-1 border rounded disabled:opacity-50"
-              >
-                Prev
-              </button>
-              <button
-                disabled={txFilters.page >= pagination.last_page}
-                onClick={() => setTxFilters({ ...txFilters, page: txFilters.page + 1 })}
-                className="px-3 py-1 border rounded disabled:opacity-50"
-              >
-                Next
-              </button>
+              {/* Top 5 Properties */}
+              <div className="bg-white p-5 rounded-2xl border border-[#D7C4B0]">
+                <h3 className="font-bold text-sm mb-4">⭐ Top 5 Properti Kost Terlaris</h3>
+                <div className="space-y-3">
+                  {platformStats?.top_properties?.map((item, idx) => {
+                    const ownerName = item.pemilik_name || item.owner_name || item.admin_name || item.pemilik?.name || 'Pemilik Kost';
+                    return (
+                      <div key={item.property_id} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl text-xs">
+                        <div>
+                          <span className="font-bold mr-2 text-[#B38E5D]">#{idx + 1}</span>
+                          <span className="font-bold text-[#261C19]">{item.property_name}</span>
+                          <p className="text-[#5C4A42] text-[11px] font-medium flex items-center gap-1 mt-0.5">
+                            <span>👤 Pemilik:</span>
+                            <span className="font-bold text-[#B38E5D]">{ownerName}</span>
+                          </p>
+                          <p className="text-slate-400 text-[10px] mt-0.5">{item.bookings} Pemesanan</p>
+                        </div>
+                        <span className="font-black text-[#261C19]">{formatRupiah(item.revenue)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* MODAL TAMBAH PENGELOLA (WITH FOTO UPLOAD) */}
+        {/* TAB 2: PERSETUJUAN PROPERTI & MONETISASI */}
+        {activeTab === 'approval' && (
+          <div className="bg-white rounded-2xl border border-[#D7C4B0] shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 bg-[#FAF5EF]/50 flex justify-between items-center">
+              <h2 className="font-bold text-[#261C19] text-base">Verifikasi Properti & Slot Iklan</h2>
+              <select
+                value={approvalFilter}
+                onChange={(e) => setApprovalFilter(e.target.value)}
+                className="text-xs border border-[#D7C4B0] p-2 rounded-lg bg-white font-bold"
+              >
+                <option value="pending_payment">Menunggu Verifikasi (Pending)</option>
+                <option value="active">Disetujui / Aktif</option>
+                <option value="rejected">Ditolak</option>
+                <option value="all">Semua Properti</option>
+              </select>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm whitespace-nowrap">
+                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100 uppercase text-[11px]">
+                  <tr>
+                    <th className="px-6 py-3.5">Nama Properti</th>
+                    <th className="px-6 py-3.5">Pemilik Kost</th>
+                    <th className="px-6 py-3.5">Harga / Bulan</th>
+                    <th className="px-6 py-3.5">Slot Berbayar</th>
+                    <th className="px-6 py-3.5">Status Persetujuan</th>
+                    <th className="px-6 py-3.5 text-center">Aksi Superadmin</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pendingProperties.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="text-center py-8 text-xs text-slate-400 font-bold">
+                        Tidak ada data properti untuk status ini.
+                      </td>
+                    </tr>
+                  ) : (
+                    pendingProperties.map((prop) => (
+                      <tr key={prop.id} className="hover:bg-slate-50 transition">
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-[#261C19]">{prop.title}</div>
+                          <div className="text-xs text-slate-500 truncate max-w-xs">{prop.address}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-slate-700">{prop.pemilik?.name || '-'}</div>
+                          <div className="text-xs text-slate-400">{prop.pemilik?.email}</div>
+                        </td>
+                        <td className="px-6 py-4 font-black text-[#261C19]">{formatRupiah(prop.price_per_month)}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold ${prop.is_paid_slot ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
+                            {prop.is_paid_slot ? '⭐ Slot Iklan/Fitur' : 'Biasa'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                            prop.approval_status === 'active' ? 'bg-emerald-100 text-emerald-700' :
+                            prop.approval_status === 'rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {prop.approval_status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            {prop.approval_status !== 'active' && (
+                              <button
+                                onClick={() => handleApprovalChange(prop.id, 'active')}
+                                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer transition shadow-xs"
+                              >
+                                ✓ Setujui
+                              </button>
+                            )}
+                            {prop.approval_status !== 'rejected' && (
+                              <button
+                                onClick={() => handleApprovalChange(prop.id, 'rejected')}
+                                className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold border border-rose-200 cursor-pointer transition"
+                              >
+                                ✕ Tolak
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: KELOLA ADMINISTRATOR / PEMILIK */}
+        {activeTab === 'administrators' && (
+          <div className="bg-white rounded-2xl border border-[#D7C4B0] shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 bg-[#FAF5EF]/50 flex justify-between items-center">
+              <h2 className="font-bold text-[#261C19] text-base">Akun Administrator & Pemilik Kost</h2>
+              <select
+                value={adminRoleFilter}
+                onChange={(e) => setAdminRoleFilter(e.target.value)}
+                className="text-xs border border-[#D7C4B0] p-2 rounded-lg bg-white font-bold"
+              >
+                <option value="">Semua Role</option>
+                <option value="admin">Pemilik Kost (Admin)</option>
+                <option value="superadmin">Superadmin</option>
+              </select>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm whitespace-nowrap">
+                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100 uppercase text-[11px]">
+                  <tr>
+                    <th className="px-6 py-3.5">Pengelola</th>
+                    <th className="px-6 py-3.5">Kontak</th>
+                    <th className="px-6 py-3.5">Role</th>
+                    <th className="px-6 py-3.5">Terdaftar</th>
+                    <th className="px-6 py-3.5 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {administrators.map((item) => {
+                    const avatarUrl = formatAvatar(item.foto || item.avatar || item.foto_profil);
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50 transition">
+                        <td className="px-6 py-4 flex items-center gap-3">
+                          <div className="relative w-9 h-9 flex-shrink-0">
+                            {avatarUrl ? (
+                              <img
+                                src={avatarUrl}
+                                alt={item.name}
+                                className="w-9 h-9 rounded-full object-cover border border-[#D7C4B0] shadow-xs"
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.style.display = 'none';
+                                  e.target.nextElementSibling.style.display = 'flex';
+                                }}
+                              />
+                            ) : null}
+                            <div
+                              className="w-9 h-9 rounded-full bg-[#B38E5D] text-white flex items-center justify-center font-bold text-xs uppercase shadow-xs"
+                              style={{ display: avatarUrl ? 'none' : 'flex' }}
+                            >
+                              {item.name ? item.name[0] : 'U'}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="font-bold text-[#261C19]">{item.name}</div>
+                            <div className="text-xs text-slate-500">{item.email}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 font-mono text-xs text-slate-600">{item.phone}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${item.role === 'superadmin' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {item.role === 'superadmin' ? 'Superadmin' : 'Pemilik Kost'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-xs text-slate-500">
+                          {new Date(item.created_at).toLocaleDateString('id-ID')}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <button
+                            onClick={() => handleDeleteAdministrator(item.id, item.name)}
+                            className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold border border-rose-200 cursor-pointer"
+                          >
+                            🗑️ Hapus
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: MONITORING USER */}
+        {activeTab === 'users' && (
+          <div className="bg-white rounded-2xl border border-[#D7C4B0] shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 bg-[#FAF5EF]/50 flex justify-between items-center">
+              <h2 className="font-bold text-[#261C19] text-base">Daftar Pengguna Website</h2>
+              <span className="text-xs text-slate-500 font-bold uppercase">Total: {users.length}</span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm whitespace-nowrap">
+                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100 uppercase text-[11px]">
+                  <tr>
+                    <th className="px-6 py-3.5">ID</th>
+                    <th className="px-6 py-3.5">Nama Lengkap</th>
+                    <th className="px-6 py-3.5">Email</th>
+                    <th className="px-6 py-3.5">Tanggal Bergabung</th>
+                    <th className="px-6 py-3.5 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {users.map((user) => (
+                    <tr key={user.id} className="hover:bg-slate-50 transition">
+                      <td className="px-6 py-4 text-xs font-mono font-bold text-slate-400">#{user.id}</td>
+                      <td className="px-6 py-4 font-bold text-[#261C19]">{user.name}</td>
+                      <td className="px-6 py-4 text-slate-600">{user.email}</td>
+                      <td className="px-6 py-4 text-xs text-slate-500">
+                        {new Date(user.created_at).toLocaleDateString('id-ID')}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <button
+                          onClick={() => handleDeleteUser(user.id, user.name)}
+                          className="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold border border-rose-200 cursor-pointer"
+                        >
+                          🗑️ Hapus User
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: REVENUE ADMIN */}
+        {activeTab === 'revenue' && (
+          <div className="bg-white rounded-2xl border border-[#D7C4B0] p-6 shadow-sm">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="font-bold text-[#261C19]">Ringkasan Pendapatan Pemilik Kost ({selectedYear})</h2>
+              <div className="text-right">
+                <span className="text-xs text-slate-500 block">Total Pendapatan Platform:</span>
+                <span className="text-xl font-black text-[#B38E5D]">
+                  {formatRupiah(revenueData?.summary?.total_platform_revenue)}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {revenueData?.admins?.map((admin) => (
+                <div key={admin.admin_id} className="border border-[#D7C4B0] p-4 rounded-xl bg-[#FAF5EF]/30">
+                  <div className="flex justify-between items-center mb-3">
+                    <div>
+                      <h3 className="font-bold text-[#261C19]">{admin.admin_name}</h3>
+                      <p className="text-xs text-slate-500">{admin.admin_email}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-bold text-emerald-600 block">{admin.yearly_bookings} Booking</span>
+                      <span className="font-extrabold text-[#261C19]">{formatRupiah(admin.yearly_total)}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-xs">
+                    {admin.monthly_revenue.map((m) => (
+                      <div key={m.month} className="bg-white p-2 rounded-lg border border-slate-200 text-center">
+                        <span className="block text-slate-400 font-bold">{m.month_name}</span>
+                        <span className="font-bold text-slate-700 block">{formatRupiah(m.revenue)}</span>
+                        <span className="text-[10px] text-slate-400">{m.bookings} transaksi</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: TRANSACTIONS */}
+        {activeTab === 'transactions' && (
+          <div className="bg-white rounded-2xl border border-[#D7C4B0] shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-[#FAF5EF]/50 grid grid-cols-1 md:grid-cols-4 gap-3">
+              <input
+                type="text"
+                placeholder="Cari Customer / Properti..."
+                value={txFilters.search}
+                onChange={(e) => setTxFilters({ ...txFilters, search: e.target.value, page: 1 })}
+                className="text-xs border border-[#D7C4B0] p-2 rounded-lg bg-white"
+              />
+
+              <select
+                value={txFilters.status}
+                onChange={(e) => setTxFilters({ ...txFilters, status: e.target.value, page: 1 })}
+                className="text-xs border border-[#D7C4B0] p-2 rounded-lg bg-white"
+              >
+                <option value="semua">Semua Status</option>
+                <option value="Menunggu Konfirmasi">Menunggu Konfirmasi</option>
+                <option value="Dikonfirmasi">Dikonfirmasi</option>
+                <option value="Dibatalkan">Dibatalkan</option>
+              </select>
+
+              <select
+                value={txFilters.admin_id}
+                onChange={(e) => setTxFilters({ ...txFilters, admin_id: e.target.value, page: 1 })}
+                className="text-xs border border-[#D7C4B0] p-2 rounded-lg bg-white"
+              >
+                <option value="">Semua Pemilik Kost</option>
+                {adminList.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+
+              <select
+                value={txFilters.month}
+                onChange={(e) => setTxFilters({ ...txFilters, month: e.target.value, page: 1 })}
+                className="text-xs border border-[#D7C4B0] p-2 rounded-lg bg-white"
+              >
+                <option value="">Semua Bulan</option>
+                {Array.from({ length: 12 }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>Bulan {i + 1}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm whitespace-nowrap">
+                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100 uppercase text-[11px]">
+                  <tr>
+                    <th className="px-6 py-3.5">ID / Tanggal</th>
+                    <th className="px-6 py-3.5">Penyewa</th>
+                    <th className="px-6 py-3.5">Properti & Kamar</th>
+                    <th className="px-6 py-3.5">Pemilik Kost</th>
+                    <th className="px-6 py-3.5">Total Harga</th>
+                    <th className="px-6 py-3.5">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {transactions.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-slate-50 transition text-xs">
+                      <td className="px-6 py-4">
+                        <div className="font-bold">#{tx.id}</div>
+                        <div className="text-slate-400">{tx.booking_date}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-bold">{tx.customer?.name || '-'}</div>
+                        <div className="text-slate-400">{tx.customer?.email}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-[#261C19]">{tx.properti?.title || '-'}</div>
+                        <div className="text-slate-400">Kamar: {tx.kamar?.nomor_kamar || '-'}</div>
+                      </td>
+                      <td className="px-6 py-4 font-bold">{tx.properti?.pemilik?.name || '-'}</td>
+                      <td className="px-6 py-4 font-black text-[#261C19]">{formatRupiah(tx.total_price)}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                          tx.status === 'Dikonfirmasi' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {tx.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="p-4 border-t border-slate-100 flex justify-between items-center text-xs">
+              <span>Menampilkan {transactions.length} dari {pagination.total || 0} transaksi</span>
+              <div className="flex gap-2">
+                <button
+                  disabled={txFilters.page === 1}
+                  onClick={() => setTxFilters({ ...txFilters, page: txFilters.page - 1 })}
+                  className="px-3 py-1 border rounded cursor-pointer disabled:opacity-50"
+                >
+                  Prev
+                </button>
+                <button
+                  disabled={txFilters.page >= pagination.last_page}
+                  onClick={() => setTxFilters({ ...txFilters, page: txFilters.page + 1 })}
+                  className="px-3 py-1 border rounded cursor-pointer disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* MODAL TAMBAH PENGELOLA */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-[#D7C4B0] overflow-hidden">
@@ -698,6 +815,7 @@ export default function SuperAdminDashboard() {
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Role</label>
                 <select name="role" value={formData.role} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm bg-white">
                   <option value="admin">Pemilik Kost (Admin)</option>
+                  <option value="superadmin">Superadmin</option>
                 </select>
               </div>
 
@@ -727,10 +845,10 @@ export default function SuperAdminDashboard() {
               </div>
 
               <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setShowModal(false)} className="w-1/2 py-2.5 rounded-xl border border-slate-300 font-bold text-xs uppercase text-slate-600">
+                <button type="button" onClick={() => setShowModal(false)} className="w-1/2 py-2.5 rounded-xl border border-slate-300 font-bold text-xs uppercase text-slate-600 cursor-pointer">
                   Batal
                 </button>
-                <button type="submit" className="w-1/2 py-2.5 rounded-xl bg-[#B38E5D] text-white font-bold text-xs uppercase shadow-md">
+                <button type="submit" className="w-1/2 py-2.5 rounded-xl bg-[#B38E5D] text-white font-bold text-xs uppercase shadow-md cursor-pointer">
                   Simpan
                 </button>
               </div>

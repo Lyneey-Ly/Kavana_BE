@@ -16,7 +16,10 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  CreditCard,
+  MessageSquare,
+  HelpCircle
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 
@@ -68,18 +71,19 @@ export default function SidebarAdmin({ children }) {
     });
   };
 
-  // 🟢 DAFTAR MENU NAVIGASI DENGAN VECTOR ICONS (lucide-react)
+  // 🟢 DAFTAR MENU NAVIGASI DENGAN IKON SESUAI
   const menuItems = [
     { name: 'Dashboard', path: '/admindashboard', icon: LayoutDashboard },
     { name: 'Profil Admin', path: '/adminprofile', icon: User },
+    { name: 'Payment Setting', path: '/AdminPaymentSettings', icon: CreditCard },
     { name: 'Kelola Properti', path: '/admin/properti', icon: Building2 },
     { name: 'Penyewa Aktif', path: '/adminpenyewa', icon: Users },
     { name: 'Tagihan & Order', path: '/adminTO', icon: Receipt },
     { name: 'Laporan Keuangan', path: '/adminlaporan', icon: TrendingUp },
-    { name: 'Kelola Komplain', path: '/admin/Komplain', icon: AlertTriangle },
+    { name: 'Kelola Komplain', path: '/admin/komplain', icon: AlertTriangle },
     { name: 'Dokumen Sewa', path: '/admin/dokumen-sewa', icon: FileText },
-    { name: 'PusatBantuan', path: '/pusatbantuanadmin', icon: FileText },
-    { name: 'RoomChat', path: '/AdminRoomChat', icon: FileText },
+    { name: 'Pusat Bantuan', path: '/pusatbantuanadmin', icon: HelpCircle },
+    { name: 'Room Chat', path: '/AdminRoomChat', icon: MessageSquare },
   ];
 
   // Helper Foto Profil
@@ -89,13 +93,13 @@ export default function SidebarAdmin({ children }) {
 
   return (
     <div className="flex h-screen bg-[#FAF5EF] overflow-hidden font-sans">
-      {/* 🟢 SIDEBAR DESKTOP (COLLAPSIBLE & LUXURY DESIGN) */}
+      {/* 🟢 SIDEBAR DESKTOP */}
       <aside
         className={`hidden md:flex flex-col bg-[#261C19] text-[#FAF5EF] border-r border-[#B38E5D]/20 h-full flex-shrink-0 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] relative z-30 shadow-2xl ${
           isCollapsed ? 'w-20' : 'w-64'
         }`}
       >
-        {/* Brand Header & Collapse Toggle Button */}
+        {/* Brand Header */}
         <div className="p-4 border-b border-[#B38E5D]/20 flex justify-between items-center min-h-[72px] relative">
           {!isCollapsed && (
             <div className="truncate transition-opacity duration-300">
@@ -119,10 +123,10 @@ export default function SidebarAdmin({ children }) {
           </button>
         </div>
 
-        {/* 👤 KARTU PROFIL ADMIN (GLASSMORPHISM ESTETIK) */}
+        {/* 👤 KARTU PROFIL ADMIN */}
         <div className="p-3 border-b border-[#B38E5D]/20 bg-[#1C1412]/60 backdrop-blur-md">
           <Link
-            to="/admin/profile"
+            to="/adminprofile"
             className={`flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#B38E5D]/10 hover:border-[#B38E5D]/30 border border-transparent transition-all group relative ${
               isCollapsed ? 'justify-center' : ''
             }`}
@@ -157,7 +161,6 @@ export default function SidebarAdmin({ children }) {
               </div>
             )}
 
-            {/* Floating Tooltip saat Collapse */}
             {isCollapsed && (
               <div className="absolute left-full ml-3 px-3 py-2 bg-[#1C1412] text-white border border-[#B38E5D]/30 rounded-lg text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200 pointer-events-none shadow-2xl z-50 flex flex-col">
                 <span className="font-bold text-[#B38E5D]">{adminProfile?.nama || 'Profil Admin'}</span>
@@ -187,7 +190,6 @@ export default function SidebarAdmin({ children }) {
                   {!isCollapsed && <span className="truncate">{item.name}</span>}
                 </Link>
 
-                {/* Floating Tooltip saat Sidebar Kolaps */}
                 {isCollapsed && (
                   <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-1.5 bg-[#1C1412] text-white border border-[#B38E5D]/30 rounded-lg text-xs font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200 pointer-events-none shadow-xl z-50 flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-[#B38E5D]" />
@@ -201,7 +203,6 @@ export default function SidebarAdmin({ children }) {
 
         {/* FOOTER & LOGOUT BUTTON */}
         <div className="p-3 border-t border-[#B38E5D]/20 space-y-2">
-         
           <div className="relative group">
             <button
               onClick={handleLogout}
@@ -295,7 +296,7 @@ export default function SidebarAdmin({ children }) {
           })}
         </nav>
 
-        {/* Mobile Logout & Notification Bell */}
+        {/* Mobile Logout */}
         <div className="p-4 border-t border-[#B38E5D]/20 bg-[#1C1412] space-y-3">
           <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-[#261C19] border border-[#B38E5D]/20">
             <span className="text-xs font-semibold text-[#D7C4B0]">Pemberitahuan System</span>
@@ -312,9 +313,8 @@ export default function SidebarAdmin({ children }) {
         </div>
       </aside>
 
-      {/* AREA KONTEN UTAMA & HEADER */}
+      {/* AREA KONTEN UTAMA */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        {/* Header Top Bar (Persisi & Selaras dengan Tema Dark Charcoal) */}
         <header className="bg-[#261C19]/95 backdrop-blur-md text-white px-4 md:px-8 py-3.5 flex justify-between items-center shadow-md border-b border-[#B38E5D]/20 sticky top-0 z-20">
           <div className="flex items-center gap-3">
             <button
@@ -337,16 +337,13 @@ export default function SidebarAdmin({ children }) {
             </div>
           </div>
 
-          {/* Akses Notifikasi & Profil Desktop Topbar */}
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#1C1412]/60 border border-[#B38E5D]/20 text-xs text-[#FAF5EF]">
               <NotificationBell />
             </div>
-
           </div>
         </header>
 
-        {/* Scrollable Main Workspace */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-[#FAF5EF]">
           {children}
         </main>

@@ -35,7 +35,7 @@ class SuperAdminController extends Controller
     }
 
     /**
-     * 📊 1. RINGKASAN STATISTIK PLATFORM
+     * 1. RINGKASAN STATISTIK PLATFORM
      */
     public function dashboardStats(Request $request)
     {
@@ -60,7 +60,7 @@ class SuperAdminController extends Controller
     }
 
     /**
-     * 👥 2. KELOLA DATA PEMILIK KOST & SUPERADMIN
+     * 2. KELOLA DATA PEMILIK KOST & SUPERADMIN
      */
     public function getAdministrators(Request $request)
     {
@@ -149,7 +149,7 @@ class SuperAdminController extends Controller
     }
 
     /**
-     * 📱 3. KELOLA DATA USER TERDAFTAR
+     * 3. KELOLA DATA USER TERDAFTAR
      */
     public function getUsers(Request $request)
     {
@@ -187,7 +187,7 @@ class SuperAdminController extends Controller
     }
 
     /**
-     * 💰 4. PENDAPATAN ADMIN (PEMILIK KOST) PER BULAN
+     * 4. PENDAPATAN ADMIN (PEMILIK KOST) PER BULAN
      */
     public function adminRevenue(Request $request)
     {
@@ -260,10 +260,8 @@ class SuperAdminController extends Controller
         ], 200);
     }
 
-
-
     /**
-     * 📈 5. STATISTIK PLATFORM LENGKAP
+     * 5. STATISTIK PLATFORM LENGKAP
      */
     public function platformStats(Request $request)
     {
@@ -362,7 +360,7 @@ class SuperAdminController extends Controller
                 ];
             });
 
-        // Top 5 properties by revenue (Menggunakan Eager Loading Relasi Pemilik)
+        // Top 5 properties by revenue
         $topProperties = Pemesanan::query()
             ->where('status', 'Dikonfirmasi')
             ->whereYear('check_in_date', $year)
@@ -406,17 +404,12 @@ class SuperAdminController extends Controller
         ], 200);
     }
 
-
-
-
-
-
     /**
-     * 🧾 6. SEMUA TRANSAKSI (SUPERADMIN VIEW)
+     * 6. SEMUA TRANSAKSI (SUPERADMIN VIEW)
      */
     public function allTransactions(Request $request)
     {
-        if (!$this->isSuperAdmin($request)) {
+        if (!$this::isSuperAdmin($request)) {
             return $this->denyAccess();
         }
 
@@ -506,7 +499,7 @@ class SuperAdminController extends Controller
     }
 
     /**
-     * 📋 7. LIST ADMIN UNTUK FILTER
+     * 7. LIST ADMIN UNTUK FILTER
      */
     public function adminList(Request $request)
     {
@@ -522,6 +515,56 @@ class SuperAdminController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => $admins
+        ], 200);
+    }
+
+    /**
+     * 8. VERIFIKASI & PENGELOLAAN STATUS PROPERTI MONETISASI (SUPERADMIN)
+     */
+    public function getPendingProperties(Request $request)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
+        $status = $request->get('approval_status', 'pending_payment');
+
+        $query = Properti::with('pemilik');
+        if ($status !== 'all') {
+            $query->where('approval_status', $status);
+        }
+
+        $properties = $query->orderBy('created_at', 'desc')->get();
+
+        return response()->json([
+            'status' => 'success',
+            'count'  => $properties->count(),
+            'data'   => $properties
+        ], 200);
+    }
+
+    public function updatePropertyApproval(Request $request, $id)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
+        $request->validate([
+            'approval_status' => 'required|in:pending_payment,active,rejected',
+        ]);
+
+        $property = Properti::find($id);
+        if (!$property) {
+            return response()->json(['message' => 'Properti tidak ditemukan'], 404);
+        }
+
+        $property->approval_status = $request->approval_status;
+        $property->save();
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => "Status persetujuan properti berhasil diubah menjadi '{$property->approval_status}'.",
+            'data'    => $property->fresh('pemilik')
         ], 200);
     }
 }

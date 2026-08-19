@@ -7,10 +7,10 @@ export default function SidebarSuperAdmin() {
 
   const menuItems = [
     { key: 'overview', label: 'Dashboard Utama', icon: '📊', path: '/SuperAdminDashboard' },
+    { key: 'approval', label: 'Persetujuan Properti', icon: '🏠', path: '/SuperAdminDashboard?tab=approval' },
     { key: 'administrators', label: 'Kelola Pengelola', icon: '👥', path: '/SuperAdminDashboard?tab=administrators' },
     { key: 'users', label: 'Monitoring User', icon: '👤', path: '/SuperAdminDashboard?tab=users' },
     { key: 'revenue', label: 'Pendapatan Admin', icon: '💰', path: '/SuperAdminDashboard?tab=revenue' },
-    { key: 'platform-stats', label: 'Statistik Platform', icon: '📈', path: '/SuperAdminDashboard?tab=platform-stats' },
     { key: 'transactions', label: 'Semua Transaksi', icon: '🧾', path: '/SuperAdminDashboard?tab=transactions' },
   ];
 
@@ -26,7 +26,7 @@ export default function SidebarSuperAdmin() {
   };
 
   return (
-    <aside className="fixed lg:static inset-y-0 left-0 z-40 w-64 lg:w-64 bg-[#261C19] text-white transform transition-transform duration-300 ease-in-out flex flex-col">
+    <aside className="fixed lg:static inset-y-0 left-0 z-40 w-64 lg:w-64 bg-[#261C19] text-white transform transition-transform duration-300 ease-in-out flex flex-col min-h-screen">
       {/* Brand Logo */}
       <div className="flex items-center justify-between h-16 px-4 border-b border-white/10">
         <div className="flex items-center gap-3">
@@ -52,7 +52,7 @@ export default function SidebarSuperAdmin() {
             <button
               key={item.key}
               onClick={() => handleNavigate(item.path)}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer ${
                 isActive
                   ? 'bg-[#B38E5D] text-white shadow-lg shadow-[#B38E5D]/30'
                   : 'text-[#D7C4B0]/80 hover:bg-white/5 hover:text-white'

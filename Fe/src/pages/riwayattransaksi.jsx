@@ -345,10 +345,7 @@ export default function RiwayatTransaksi() {
                           <span className="text-[#2D2321] font-semibold">{item.tanggalMasuk}</span>
                         </div>
                         
-<<<<<<< HEAD
                         {/* TANGGAL KELUAR / BATAS KONTRAK */}
-=======
->>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
                         <div>
                           <span className="text-[#B38E5D] block text-[10px] uppercase tracking-wider font-bold">Batas Kontrak:</span>
                           <span className="text-emerald-700 font-bold">{item.tanggalKeluar}</span>
@@ -492,10 +489,7 @@ export default function RiwayatTransaksi() {
                   <span className="font-semibold">{selectedStruk.tanggalMasuk}</span>
                 </div>
                 
-<<<<<<< HEAD
                 {/* TANGGAL KELUAR DI STRUK */}
-=======
->>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
                 <div className="flex justify-between text-emerald-800 bg-emerald-50 px-2 py-1 rounded">
                   <span className="font-bold">Batas Kontrak:</span>
                   <span className="font-bold">{selectedStruk.tanggalKeluar}</span>

@@ -8,6 +8,7 @@ use App\Models\Pemesanan;
 use App\Models\Properti;
 use App\Models\Kamar;
 use App\Models\FinanceTracker;
+use App\Models\Administrator;
 use App\Services\NotificationService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -36,6 +37,81 @@ class PembayaranController extends Controller
     }
 
     /**
+     * CUSTOMER: Ambil Instruksi Pembayaran & Rekening / QRIS Pemilik Properti
+     */
+    public function getPaymentInstruction($pemesananId)
+    {
+        $user = Auth::guard('sanctum')->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        $pemesanan = Pemesanan::with(['properti.pemilik', 'kamar'])->find($pemesananId);
+
+        if (!$pemesanan) {
+            return response()->json(['message' => 'Data pemesanan tidak ditemukan'], 404);
+        }
+
+        if ($pemesanan->customer_id !== $user->id) {
+            return response()->json(['message' => 'Forbidden. Akses ditolak!'], 403);
+        }
+
+        // Set expired_at otomatis (1 jam dari booking) jika belum ada
+        if (!$pemesanan->expired_at) {
+            $pemesanan->expired_at = Carbon::parse($pemesanan->created_at)->addHour();
+            $pemesanan->save();
+        }
+
+        $now = Carbon::now();
+        $expiredAt = Carbon::parse($pemesanan->expired_at);
+        $isExpired = $now->greaterThan($expiredAt);
+
+        if ($isExpired && $pemesanan->status === 'Tertunda') {
+            $pemesanan->status = 'Kadaluarsa';
+            $pemesanan->save();
+        }
+
+        // Cari data pemilik properti atau admin default
+        $owner = $pemesanan->properti->pemilik ?? Administrator::whereNotNull('banks')->orWhereNotNull('bank_name')->first() ?? Administrator::first();
+
+        // Parse daftar multi-bank
+        $banks = [];
+        if ($owner && !empty($owner->banks)) {
+            $banks = is_string($owner->banks) ? json_decode($owner->banks, true) : $owner->banks;
+        } elseif ($owner && $owner->bank_name) {
+            $banks = [[
+                'bank_name'      => $owner->bank_name,
+                'account_number' => $owner->account_number,
+                'account_holder' => $owner->account_holder,
+            ]];
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => [
+                'pemesanan_id'      => $pemesanan->id,
+                'total_price'       => (float) $pemesanan->total_price,
+                'status'            => $pemesanan->status,
+                'expired_at'        => $expiredAt->toIso8601String(),
+                'remaining_seconds' => $isExpired ? 0 : max(0, $now->diffInSeconds($expiredAt, false)),
+                'is_expired'        => $isExpired,
+                'owner_payment'     => [
+                    'banks'          => $banks,
+                    'bank_name'      => $owner->bank_name ?? 'Bank BCA',
+                    'account_number' => $owner->account_number ?? 'Belum Diatur',
+                    'account_holder' => $owner->account_holder ?? 'Pemilik Kost',
+                    'qris_image'     => ($owner && $owner->qris_image) ? asset('storage/' . $owner->qris_image) : null,
+                ],
+                'properti'          => [
+                    'title'  => $pemesanan->properti->title ?? $pemesanan->properti->nama_properti ?? '-',
+                    'gambar' => $pemesanan->properti->main_image ? asset('storage/' . $pemesanan->properti->main_image) : null,
+                ]
+            ]
+        ], 200);
+    }
+
+    /**
      * CUSTOMER: Kirim Bukti Pembayaran
      */
     public function bayar(Request $request)
@@ -49,8 +125,8 @@ class PembayaranController extends Controller
         $request->validate([
             'pemesanan_id'   => 'required|exists:pemesanans,id',
             'amount'         => 'required|numeric|min:1000',
-            'payment_method' => 'required|string|max:50',
-            'payment_proof'  => 'required|image|mimes:jpeg,png,jpg|max:2048',
+            'payment_method' => 'required|string|max:100',
+            'payment_proof'  => 'required|image|mimes:jpeg,png,jpg,webp|max:2048',
         ]);
 
         $pemesanan = Pemesanan::find($request->pemesanan_id);
@@ -64,6 +140,16 @@ class PembayaranController extends Controller
             return response()->json([
                 'message' => 'Forbidden. Anda tidak berhak mengunggah pembayaran untuk pemesanan ini!'
             ], 403);
+        }
+
+        // Cek Batas Waktu Expired
+        if ($pemesanan->expired_at && Carbon::now()->greaterThan(Carbon::parse($pemesanan->expired_at))) {
+            $pemesanan->status = 'Kadaluarsa';
+            $pemesanan->save();
+
+            return response()->json([
+                'message' => 'Waktu pembayaran telah kadaluarsa! Silakan lakukan booking ulang.'
+            ], 400);
         }
 
         if ($pemesanan->status !== 'Tertunda') {
@@ -214,6 +300,66 @@ class PembayaranController extends Controller
         return response()->json([
             'message' => 'Berhasil mengambil data tagihan dan order',
             'data'    => $data
+        ], 200);
+    }
+
+    /**
+     * ADMIN: Proses Payment Gateway (Publikasi Properti)
+     */
+    public function payGateway(Request $request, $id)
+    {
+        $admin = Auth::guard('sanctum')->user();
+
+        if (!$admin) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        $properti = Properti::find($id);
+
+        if (!$properti) {
+            return response()->json(['message' => 'Properti tidak ditemukan'], 404);
+        }
+
+        // Simulasi/Generate Token Midtrans Gateway
+        $snapToken = 'MOCK-SNAP-TOKEN-' . time() . '-' . $properti->id;
+
+        return response()->json([
+            'message'     => 'Token transaksi publikasi properti berhasil dibuat',
+            'snap_token'  => $snapToken,
+            'payment_url' => null
+        ], 200);
+    }
+
+    /**
+     * ADMIN: Upload Bukti Transfer Manual (Publikasi Properti)
+     */
+    public function uploadProof(Request $request, $id)
+    {
+        $admin = Auth::guard('sanctum')->user();
+
+        if (!$admin) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        $request->validate([
+            'proof_image' => 'required|image|mimes:jpeg,png,jpg,webp|max:2048',
+        ]);
+
+        $properti = Properti::find($id);
+
+        if (!$properti) {
+            return response()->json(['message' => 'Properti tidak ditemukan'], 404);
+        }
+
+        $path = $request->file('proof_image')->store('payment_proofs/properties', 'public');
+
+        $properti->update([
+            'approval_status' => 'waiting_verification',
+        ]);
+
+        return response()->json([
+            'message' => 'Bukti pembayaran publikasi properti berhasil diunggah! Menunggu verifikasi.',
+            'data'    => $properti
         ], 200);
     }
 }

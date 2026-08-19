@@ -34,6 +34,8 @@ import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import PusatBantuanuser from './pages/pusatbantuanuser';
 import PusatBantuanAdmin from './pages/pusatbantuanadmin';
 import AdminRoomChat from './pages/AdminRoomChat';
+import AdminPaymentSettings from './pages/AdminPaymenSettings';
+import PembayaranAdmin from './pages/PembayaranAdmin';
 import Beranda from './pages/beranda';
 
 
@@ -75,6 +77,8 @@ export default function App() {
             <Route path="/dokumen-sewa/:id" element={<Dokumen />} />
 
             {/* Admin Routes */}
+            <Route path="/AdminPaymentSettings" element={<AdminPaymentSettings/>} /> 
+
             <Route path="/adminprofile" element={<AdminProfile />} />
             <Route path="/admindashboard" element={<AdminDashboard />} />
             <Route path="/adminlaporan" element={<AdminLaporanKeuangan />} />
@@ -88,6 +92,7 @@ export default function App() {
             <Route path="/NotificationBell" element={<NotificationBell />} />
             <Route path="/pusatbantuanadmin" element={<PusatBantuanAdmin />} /> 
             <Route path="/AdminRoomChat" element={<AdminRoomChat/>} /> 
+            <Route path="/PembayaranAdmin/:id" element={<PembayaranAdmin/>} /> 
 
           </Routes>
         </div>

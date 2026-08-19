@@ -16,7 +16,6 @@ class PropertyController extends Controller
     {
         $query = Properti::with(['pemilik', 'kamars']); 
 
-        // 1. FILTER MILIK ADMIN (Penanganan Multi-User & Super Admin)
         $user = Auth::guard('sanctum')->user();
 
         // Jika dipanggil dari Dashboard Admin (?my_properties=true)
@@ -32,6 +31,10 @@ class PropertyController extends Controller
         // Atau jika dikirim filter ID pemilik secara langsung
         elseif ($request->filled('pemilik_id')) {
             $query->where('pemilik_id', $request->pemilik_id);
+        } 
+        else {
+            // Untuk Katalog Publik: Hanya tampilkan properti yang berstatus persetujuan 'active'
+            $query->where('approval_status', 'active');
         }
 
         // Filter Pencarian Umum (Public / Catalog)
@@ -101,7 +104,7 @@ class PropertyController extends Controller
     }
 
     /**
-     * Simpan data properti baru beserta foto utama, galeri & template perjanjian
+     * Simpan data properti baru beserta foto utama, galeri, template perjanjian & monetisasi
      */
     public function store(Request $request)
     {
@@ -120,6 +123,8 @@ class PropertyController extends Controller
             'template_perjanjian' => 'nullable|string',
             'lease_agreement'     => 'nullable|string',
             'status'              => 'nullable|string',
+            'is_paid_slot'        => 'nullable|boolean',
+            'approval_status'     => 'nullable|in:pending_payment,active,rejected',
             'main_image'          => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
             'gallery_images'      => 'nullable|array',
             'gallery_images.*'    => 'image|mimes:jpeg,png,jpg,webp|max:2048',
@@ -150,6 +155,10 @@ class PropertyController extends Controller
         // Ambil isi dokumen dari lease_agreement atau template_perjanjian
         $templateText = $request->input('lease_agreement') ?? $request->input('template_perjanjian');
 
+        // Pengaturan Monetisasi
+        $isPaidSlot = $request->boolean('is_paid_slot', false);
+        $approvalStatus = $request->input('approval_status', $isPaidSlot ? 'pending_payment' : 'active');
+
         $property = Properti::create([
             'pemilik_id'          => $user->id,
             'title'               => $request->title,
@@ -165,6 +174,8 @@ class PropertyController extends Controller
             'description'         => $request->description,
             'template_perjanjian' => $templateText,
             'status'              => $request->status ?? 'Tersedia',
+            'is_paid_slot'        => $isPaidSlot,
+            'approval_status'     => $approvalStatus,
             'main_image'          => $imagePath,
             'gallery_images'      => $galleryPaths,
         ]);
@@ -195,7 +206,7 @@ class PropertyController extends Controller
     }
 
     /**
-     * Update data properti, foto utama, galeri & template perjanjian
+     * Update data properti, foto utama, galeri, template perjanjian & status monetisasi
      */
     public function update(Request $request, $id)
     {
@@ -232,6 +243,8 @@ class PropertyController extends Controller
             'template_perjanjian' => 'sometimes|nullable|string',
             'lease_agreement'     => 'sometimes|nullable|string',
             'status'              => 'sometimes|required|string',
+            'is_paid_slot'        => 'sometimes|nullable|boolean',
+            'approval_status'     => 'sometimes|nullable|in:pending_payment,active,rejected',
             'main_image'          => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
             'gallery_images'      => 'nullable|array',
             'gallery_images.*'    => 'image|mimes:jpeg,png,jpg,webp|max:2048',

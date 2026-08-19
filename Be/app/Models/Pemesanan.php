@@ -14,12 +14,17 @@ class Pemesanan extends Model
     protected $fillable = [
         'customer_id',
         'properti_id',
-        'kamar_id', // 👈 WAJIB ADA! Agar kamar_id bisa tersimpan saat booking
+        'kamar_id',
         'booking_date',
         'check_in_date',
         'duration_months',
         'total_price',
         'status',
+        'expired_at', // 👈 Ditambahkan untuk batas waktu bayar
+    ];
+
+    protected $casts = [
+        'expired_at' => 'datetime', // 👈 Ditambahkan agar Carbon membaca tanggal otomatis
     ];
 
     public function customer()
