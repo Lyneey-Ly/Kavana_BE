@@ -14,20 +14,19 @@ class PropertyController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Properti::with('pemilik'); 
+        $query = Properti::with(['pemilik', 'kamars']); 
 
-        // 🟢 1. FILTER MILIK ADMIN (Penanganan Multi-User & Super Admin)
+        // 1. FILTER MILIK ADMIN (Penanganan Multi-User & Super Admin)
         $user = Auth::guard('sanctum')->user();
 
         // Jika dipanggil dari Dashboard Admin (?my_properties=true)
         if ($request->boolean('my_properties')) {
             if ($user) {
                 $role = strtolower($user->role ?? '');
-                // Jika Admin biasa (seperti JohnDoe), HANYA ambil properti miliknya sendiri
+                // Jika Admin biasa, HANYA ambil properti miliknya sendiri
                 if (!in_array($role, ['superadmin', 'super_admin'])) {
                     $query->where('pemilik_id', $user->id);
                 }
-                // Jika Superadmin, biarkan ambil SEMUA properti
             }
         } 
         // Atau jika dikirim filter ID pemilik secara langsung
@@ -35,7 +34,7 @@ class PropertyController extends Controller
             $query->where('pemilik_id', $request->pemilik_id);
         }
 
-        // 🔍 Filter Pencarian Umum (Public / Catalog)
+        // Filter Pencarian Umum (Public / Catalog)
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
@@ -70,7 +69,7 @@ class PropertyController extends Controller
     }
 
     /**
-     * 🆕 KHUSUS DASHBOARD ADMIN: Ambil properti terfilter otomatis berdasarkan admin yang login
+     * KHUSUS DASHBOARD ADMIN: Ambil properti terfilter otomatis berdasarkan admin yang login
      */
     public function indexAdmin(Request $request)
     {
@@ -82,12 +81,12 @@ class PropertyController extends Controller
             ], 401);
         }
 
-        $query = Properti::with('pemilik');
+        $query = Properti::with(['pemilik', 'kamars']);
 
         $role = strtolower($user->role ?? '');
         $isSuperAdmin = in_array($role, ['superadmin', 'super_admin']);
 
-        // 🔒 Jika BUKAN Superadmin, paksa HANYA ambil properti milik admin yang login
+        // Jika BUKAN Superadmin, paksa HANYA ambil properti milik admin yang login
         if (!$isSuperAdmin) {
             $query->where('pemilik_id', $user->id);
         }
@@ -102,24 +101,28 @@ class PropertyController extends Controller
     }
 
     /**
-     * Simpan data properti baru beserta foto utama & galeri
+     * Simpan data properti baru beserta foto utama, galeri & template perjanjian
      */
     public function store(Request $request)
     {
         $request->validate([
-            'title'             => 'required|string|max:255',
-            'type'              => 'required|string',
-            'gender_type'       => 'required|string',
-            'price_per_month'   => 'required|numeric',
-            'address'           => 'required|string',
-            'facilities'        => 'nullable|string',
-            'public_facilities' => 'nullable|string', // 👈 DITAMBAHKAN
-            'rules'             => 'nullable|string', // 👈 DITAMBAHKAN
-            'description'       => 'nullable|string', // 👈 DITAMBAHKAN
-            'status'            => 'nullable|string',
-            'main_image'        => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
-            'gallery_images'    => 'nullable|array',
-            'gallery_images.*'  => 'image|mimes:jpeg,png,jpg,webp|max:2048',
+            'title'               => 'required|string|max:255',
+            'type'                => 'required|string',
+            'gender_type'         => 'required|string',
+            'price_per_month'     => 'required|numeric',
+            'address'             => 'required|string',
+            'latitude'            => 'nullable|numeric|between:-90,90',
+            'longitude'           => 'nullable|numeric|between:-180,180',
+            'facilities'          => 'nullable|string',
+            'public_facilities'   => 'nullable|string',
+            'rules'               => 'nullable|string',
+            'description'         => 'nullable|string',
+            'template_perjanjian' => 'nullable|string',
+            'lease_agreement'     => 'nullable|string',
+            'status'              => 'nullable|string',
+            'main_image'          => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+            'gallery_images'      => 'nullable|array',
+            'gallery_images.*'    => 'image|mimes:jpeg,png,jpg,webp|max:2048',
         ]);
 
         $user = Auth::guard('sanctum')->user();
@@ -144,23 +147,29 @@ class PropertyController extends Controller
             }
         }
 
+        // Ambil isi dokumen dari lease_agreement atau template_perjanjian
+        $templateText = $request->input('lease_agreement') ?? $request->input('template_perjanjian');
+
         $property = Properti::create([
-            'pemilik_id'        => $user->id,
-            'title'             => $request->title,
-            'type'              => $request->type,
-            'gender_type'       => $request->gender_type,
-            'price_per_month'   => $request->price_per_month,
-            'address'           => $request->address,
-            'facilities'        => $request->facilities ?? 'Kamar Mandi Dalam',
-            'public_facilities' => $request->public_facilities, // 👈 DITAMBAHKAN
-            'rules'             => $request->rules,             // 👈 DITAMBAHKAN
-            'description'       => $request->description,       // 👈 DITAMBAHKAN
-            'status'            => $request->status ?? 'Tersedia',
-            'main_image'        => $imagePath,
-            'gallery_images'    => $galleryPaths,
+            'pemilik_id'          => $user->id,
+            'title'               => $request->title,
+            'type'                => $request->type,
+            'gender_type'         => $request->gender_type,
+            'price_per_month'     => $request->price_per_month,
+            'address'             => $request->address,
+            'latitude'            => $request->latitude,
+            'longitude'           => $request->longitude,
+            'facilities'          => $request->facilities ?? 'Kamar Mandi Dalam',
+            'public_facilities'   => $request->public_facilities,
+            'rules'               => $request->rules,
+            'description'         => $request->description,
+            'template_perjanjian' => $templateText,
+            'status'              => $request->status ?? 'Tersedia',
+            'main_image'          => $imagePath,
+            'gallery_images'      => $galleryPaths,
         ]);
 
-        $property->load('pemilik');
+        $property->load(['pemilik', 'kamars']);
 
         return response()->json([
             'message' => 'Property created successfully!',
@@ -186,7 +195,7 @@ class PropertyController extends Controller
     }
 
     /**
-     * Update data properti, foto utama & galeri
+     * Update data properti, foto utama, galeri & template perjanjian
      */
     public function update(Request $request, $id)
     {
@@ -196,7 +205,7 @@ class PropertyController extends Controller
             return response()->json(['message' => 'Property not found'], 404);
         }
 
-        // 🟢 Cek Hak Akses (Super Admin bebas edit, Admin biasa cuma punya sendiri)
+        // Cek Hak Akses
         $user = Auth::guard('sanctum')->user();
         if ($user) {
             $role = strtolower($user->role ?? '');
@@ -209,22 +218,31 @@ class PropertyController extends Controller
         }
 
         $request->validate([
-            'title'             => 'sometimes|required|string|max:255',
-            'type'              => 'sometimes|required|string',
-            'gender_type'       => 'sometimes|required|string',
-            'price_per_month'   => 'sometimes|required|numeric',
-            'address'           => 'sometimes|required|string',
-            'facilities'        => 'sometimes|nullable|string',
-            'public_facilities' => 'sometimes|nullable|string', // 👈 DITAMBAHKAN
-            'rules'             => 'sometimes|nullable|string', // 👈 DITAMBAHKAN
-            'description'       => 'sometimes|nullable|string', // 👈 DITAMBAHKAN
-            'status'            => 'sometimes|required|string',
-            'main_image'        => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
-            'gallery_images'    => 'nullable|array',
-            'gallery_images.*'  => 'image|mimes:jpeg,png,jpg,webp|max:2048',
+            'title'               => 'sometimes|required|string|max:255',
+            'type'                => 'sometimes|required|string',
+            'gender_type'         => 'sometimes|required|string',
+            'price_per_month'     => 'sometimes|required|numeric',
+            'address'             => 'sometimes|required|string',
+            'latitude'            => 'nullable|numeric|between:-90,90',
+            'longitude'           => 'nullable|numeric|between:-180,180',
+            'facilities'          => 'sometimes|nullable|string',
+            'public_facilities'   => 'sometimes|nullable|string',
+            'rules'               => 'sometimes|nullable|string',
+            'description'         => 'sometimes|nullable|string',
+            'template_perjanjian' => 'sometimes|nullable|string',
+            'lease_agreement'     => 'sometimes|nullable|string',
+            'status'              => 'sometimes|required|string',
+            'main_image'          => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+            'gallery_images'      => 'nullable|array',
+            'gallery_images.*'    => 'image|mimes:jpeg,png,jpg,webp|max:2048',
         ]);
 
-        $data = $request->except(['main_image', 'gallery_images']);
+        $data = $request->except(['main_image', 'gallery_images', 'lease_agreement']);
+
+        if ($request->has('lease_agreement') || $request->has('template_perjanjian')) {
+            $templateText = $request->input('lease_agreement') ?? $request->input('template_perjanjian');
+            $data['template_perjanjian'] = $templateText;
+        }
 
         if ($request->hasFile('main_image')) {
             if ($property->main_image && Storage::disk('public')->exists($property->main_image)) {
@@ -253,7 +271,7 @@ class PropertyController extends Controller
 
         return response()->json([
             'message' => 'Property updated successfully!',
-            'data'    => $property->fresh('pemilik')
+            'data'    => $property->fresh(['pemilik', 'kamars'])
         ], 200);
     }
 
@@ -268,7 +286,7 @@ class PropertyController extends Controller
             return response()->json(['message' => 'Property not found'], 404);
         }
 
-        // 🟢 Cek Hak Akses (Super Admin bebas hapus, Admin biasa cuma punya sendiri)
+        // Cek Hak Akses
         $user = Auth::guard('sanctum')->user();
         if ($user) {
             $role = strtolower($user->role ?? '');

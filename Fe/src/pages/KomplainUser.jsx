@@ -6,7 +6,7 @@ import Footer from '../components/footer';
 
 export default function KomplainUser() {
   const [complaints, setComplaints] = useState([]);
-  const [activeRentals, setActiveRentals] = useState([]); // Array untuk menampung banyak sewa aktif
+  const [activeRentals, setActiveRentals] = useState([]); // Array untuk menampung sewa aktif
   const [selectedRentalId, setSelectedRentalId] = useState('');
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -42,9 +42,17 @@ export default function KomplainUser() {
       setComplaints(res.data.data || []);
     } catch (err) {
       console.error('Gagal mengambil daftar komplain:', err);
-    } finally {
+    }  {
       setLoading(false);
     }
+  };
+
+  // Helper untuk set propertiId dan kamarId berdasarkan unit yang dipilih
+  const selectRentalUnit = (rental) => {
+    if (!rental) return;
+    setSelectedRentalId(rental.id || '');
+    setPropertiId(rental.properti_id || rental.properti?.id || '');
+    setKamarId(rental.kamar_id || rental.kamar?.id || '');
   };
 
   // Fetch Semua Data Sewa Aktif User (Bisa > 1)
@@ -66,15 +74,7 @@ export default function KomplainUser() {
     }
   };
 
-  // Helper untuk set propertiId dan kamarId berdasarkan unit yang dipilih
-  const selectRentalUnit = (rental) => {
-    if (!rental) return;
-    setSelectedRentalId(rental.id || '');
-    setPropertiId(rental.properti_id || rental.properti?.id || '');
-    setKamarId(rental.kamar_id || rental.kamar?.id || '');
-  };
-
-  // Handler saat user memilih item di Dropdown Properti
+  // Handler saat user memilih item di Dropdown Properti/Kamar
   const handleRentalChange = (e) => {
     const targetId = e.target.value;
     const foundRental = activeRentals.find((r) => r.id.toString() === targetId.toString());
@@ -121,6 +121,25 @@ export default function KomplainUser() {
     setFotoPreview(null);
   };
 
+  const handleOpenModal = () => {
+    if (activeRentals.length === 0) {
+      Swal.fire({
+        icon: 'info',
+        title: 'Tidak Ada Sewa Aktif',
+        text: 'Kamu belum memiliki sewa kamar/unit yang aktif untuk mengajukan komplain!',
+        confirmButtonColor: '#261C19',
+      });
+      return;
+    }
+
+    // Pastikan unit pertama terpilih saat modal dibuka
+    if (activeRentals.length > 0 && !selectedRentalId) {
+      selectRentalUnit(activeRentals[0]);
+    }
+    
+    setShowModal(true);
+  };
+
   const handleCloseModal = () => {
     setJudul('');
     setDeskripsi('');
@@ -134,8 +153,8 @@ export default function KomplainUser() {
     if (!propertiId) {
       Swal.fire({
         icon: 'error',
-        title: 'Properti Belum Dipilih',
-        text: 'Silakan pilih properti/kamar yang ingin kamu laporkan!',
+        title: 'Kamar/Properti Belum Dipilih',
+        text: 'Silakan pilih kamar yang ingin kamu laporkan!',
         confirmButtonColor: '#261C19',
       });
       return;
@@ -251,18 +270,7 @@ export default function KomplainUser() {
             </div>
 
             <button
-              onClick={() => {
-                if (activeRentals.length === 0) {
-                  Swal.fire({
-                    icon: 'info',
-                    title: 'Tidak Ada Sewa Aktif',
-                    text: 'Kamu belum memiliki sewa kamar/unit yang aktif untuk mengajukan komplain!',
-                    confirmButtonColor: '#261C19',
-                  });
-                  return;
-                }
-                setShowModal(true);
-              }}
+              onClick={handleOpenModal}
               className="bg-[#261C19] hover:bg-[#3D2D29] text-white px-6 py-3.5 rounded-2xl text-xs font-extrabold uppercase tracking-widest transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] flex items-center justify-center gap-2 cursor-pointer shrink-0"
             >
               <span>✨</span> Buat Komplain Baru
@@ -478,53 +486,51 @@ export default function KomplainUser() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               
-              {/* DROPDOWN PILIH PROPERTI & KAMAR */}
+              {/* DROPDOWN PILIH KAMAR/UNIT DISEWA */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#261C19]">
-                  Pilih Unit / Kamar Disewa <span className="text-rose-500">*</span>
+                  Pilih Kamar / Unit Disewa <span className="text-rose-500">*</span>
                 </label>
                 <select
                   value={selectedRentalId}
                   onChange={handleRentalChange}
-                  className="w-full text-xs p-3.5 rounded-xl border border-[#E5D7C5] bg-[#FAF6F0] text-[#261C19] font-bold focus:outline-none focus:border-[#C5A059] cursor-pointer"
+                  disabled={activeRentals.length <= 1}
+                  className="w-full text-xs p-3.5 rounded-xl border border-[#E5D7C5] bg-[#FAF6F0] text-[#261C19] font-bold focus:outline-none focus:border-[#C5A059] cursor-pointer disabled:opacity-80 disabled:bg-slate-100"
                 >
                   {activeRentals.map((rental) => {
                     const propName = rental.properti?.nama_properti || rental.properti?.title || rental.properti?.nama || 'Properti';
                     const kamNum = rental.kamar?.nomor_kamar || rental.kamar?.nama_kamar || rental.kamar?.nama;
-                    const kamarLabel = kamNum ? ` (Kamar ${kamNum})` : '';
                     
                     return (
                       <option key={rental.id} value={rental.id}>
-                        📍 {propName} {kamarLabel}
+                        🚪 {propName} {kamNum ? ` - Kamar ${kamNum}` : ''}
                       </option>
                     );
                   })}
                 </select>
                 <span className="text-[10px] text-slate-400 block pt-0.5">
-                  *Pilih unit sewa yang bermasalah jika kamu memiliki lebih dari 1 sewa aktif.
+                  {activeRentals.length > 1
+                    ? '*Silakan pilih unit/kamar yang sedang kamu alami kendala.'
+                    : '*Otomatis terisi sesuai kamar aktif yang kamu sewa.'}
                 </span>
               </div>
 
+              {/* JUDUL KOMPLAIN */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#261C19]">
-                  No.Kamar <span className="text-rose-500">*</span>
+                  Judul Keluhan / Masalah <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="1
-                  2
-                  3
-                  4
-                  5
-                  6
-                  7"
+                  placeholder="Contoh: AC Mati / Air Keran Tidak Mengalir / Lampu Rusak"
                   value={judul}
                   onChange={(e) => setJudul(e.target.value)}
                   className="w-full text-xs p-3.5 rounded-xl border border-[#E5D7C5] bg-[#FAF6F0]/50 focus:outline-none focus:border-[#C5A059] text-[#261C19] font-medium"
                 />
               </div>
 
+              {/* DESKRIPSI DETAIL */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#261C19]">
                   Deskripsi Detail <span className="text-rose-500">*</span>
@@ -539,6 +545,7 @@ export default function KomplainUser() {
                 ></textarea>
               </div>
 
+              {/* UPLOAD FOTO */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-[#261C19]">Foto Bukti Lapangan (Maks 2MB)</label>
                 
@@ -571,6 +578,7 @@ export default function KomplainUser() {
                 )}
               </div>
 
+              {/* BUTTON ACTION */}
               <div className="flex gap-3 pt-3">
                 <button
                   type="button"

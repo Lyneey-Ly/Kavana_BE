@@ -9,7 +9,7 @@ function ChatRoom() {
 
   // Mode Active Chat
   const [activeChatType, setActiveChatType] = useState('group'); // 'group' atau 'direct'
-  const [activeProperties, setActiveProperties] = useState([]); // 🆕 Array menyimpan semua properti aktif
+  const [activeProperties, setActiveProperties] = useState([]); // Array menyimpan semua properti aktif
   const [propertiId, setPropertiId] = useState('');
   const [propertiData, setPropertiData] = useState(null);
   const [receiverId, setReceiverId] = useState('');
@@ -201,6 +201,8 @@ function ChatRoom() {
     );
   };
 
+  const activeNoKamar = propertiData?.kamar?.nomor_kamar || propertiData?.nomor_kamar;
+
   return (
     <SidebarUser>
       <div className="min-h-screen bg-[#FAF5EF] p-2 md:p-6 flex items-center justify-center font-sans">
@@ -208,7 +210,7 @@ function ChatRoom() {
         {/* CONTAINER UTAMA (SPLIT SCREEN WA/IG STYLE) */}
         <div className="w-full max-w-6xl h-[calc(100vh-5rem)] min-h-[580px] bg-white rounded-2xl shadow-2xl border border-[#D7C4B0]/60 overflow-hidden flex flex-col md:flex-row">
           
-          {/* 👈 KIRI: SIDEBAR DAFTAR CHAT */}
+          {/* KIRI: SIDEBAR DAFTAR CHAT */}
           <div className="w-full md:w-80 lg:w-96 bg-[#FAF5EF]/50 border-r border-[#D7C4B0]/60 flex flex-col h-1/3 md:h-full flex-shrink-0">
             
             {/* Header Sidebar Kiri */}
@@ -264,6 +266,7 @@ function ChatRoom() {
                     activeProperties.map((prop) => {
                       const isSelected = activeChatType === 'group' && propertiId === prop.id.toString();
                       const propName = prop.nama_properti || prop.nama || prop.title || `Properti #${prop.id}`;
+                      const itemNoKamar = prop.kamar?.nomor_kamar || prop.nomor_kamar;
 
                       return (
                         <div
@@ -291,8 +294,8 @@ function ChatRoom() {
                                 OFFICIAL
                               </span>
                             </div>
-                            <p className="text-[11px] text-gray-500 truncate mt-0.5">
-                              Ruang chat penghuni properti
+                            <p className="text-[11px] text-[#B38E5D] font-bold truncate mt-0.5">
+                              {itemNoKamar ? `🚪 Kamar No. ${itemNoKamar}` : 'Ruang chat penghuni'}
                             </p>
                           </div>
                         </div>
@@ -343,7 +346,7 @@ function ChatRoom() {
             </div>
           </div>
 
-          {/* 👉 KANAN: CHAT WINDOW UTAMA */}
+          {/* KANAN: CHAT WINDOW UTAMA */}
           <div className="flex-1 flex flex-col h-2/3 md:h-full bg-[#FAF5EF]/30">
             
             {/* HEADER CHAT AKTIF */}
@@ -360,7 +363,9 @@ function ChatRoom() {
                   </h3>
                   <p className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    {activeChatType === 'group' ? 'Ruang Diskusi Penghuni' : 'Private Conversation'}
+                    {activeChatType === 'group' 
+                      ? (activeNoKamar ? `Ruang Diskusi • Kamar No. ${activeNoKamar}` : 'Ruang Diskusi Penghuni') 
+                      : 'Private Conversation'}
                   </p>
                 </div>
               </div>
@@ -368,7 +373,9 @@ function ChatRoom() {
               {/* Status Badge */}
               <div className="text-right hidden sm:block">
                 <span className="text-[10px] bg-[#FAF5EF] text-[#261C19] px-3 py-1 rounded-full font-bold border border-[#D7C4B0]">
-                  {activeChatType === 'group' ? `Property ID: ${propertiId || '...'}` : `User ID Target: ${receiverId || 'Belum dipilih'}`}
+                  {activeChatType === 'group' 
+                    ? `Property ID: ${propertiId || '...'}${activeNoKamar ? ` | Kamar ${activeNoKamar}` : ''}` 
+                    : `User ID Target: ${receiverId || 'Belum dipilih'}`}
                 </span>
               </div>
             </div>

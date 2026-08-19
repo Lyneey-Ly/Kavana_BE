@@ -34,12 +34,12 @@ export default function Footer() {
               </Link>
             </li>
             <li>
-              <Link to="/promo" className="hover:text-[#B38E5D] transition-colors">
+              <Link to="/carihunian" className="hover:text-[#B38E5D] transition-colors">
                 Promo &amp; Diskon Hunian
               </Link>
             </li>
             <li>
-              <Link to="/survei" className="hover:text-[#B38E5D] transition-colors">
+              <Link to="/testimoni" className="hover:text-[#B38E5D] transition-colors">
                 Jadwalkan Survei Gratis
               </Link>
             </li>
@@ -99,10 +99,10 @@ export default function Footer() {
           © 2026 Kafana Vista. All rights reserved.
         </p>
         <div className="flex items-center gap-6">
-          <Link to="/syarat-ketentuan" className="hover:text-[#B38E5D] transition-colors">
+          <Link to="/PusatBantuan" className="hover:text-[#B38E5D] transition-colors">
             Syarat &amp; Ketentuan
           </Link>
-          <Link to="/kebijakan-privasi" className="hover:text-[#B38E5D] transition-colors">
+          <Link to="/PusatBantuan" className="hover:text-[#B38E5D] transition-colors">
             Kebijakan Privasi
           </Link>
         </div>

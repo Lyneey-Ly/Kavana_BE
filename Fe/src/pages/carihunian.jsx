@@ -37,6 +37,9 @@ const formatImage = (item) => {
   return `http://127.0.0.1:8000/storage/${rawImage}`;
 };
 
+
+
+
 export default function CariHunian() {
   const navigate = useNavigate();
 

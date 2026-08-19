@@ -58,7 +58,7 @@ export default function SuperAdminDashboard() {
   // --- FETCHERS ---
   const fetchOverviewStats = useCallback(async () => {
     try {
-      const resStats = await API.get('/superadmin/stats');
+      const resStats = await API.get('/admin/superadmin/stats');
       setStats(resStats.data.data);
     } catch (err) {
       console.error('Gagal memuat statistik umum', err);
@@ -67,7 +67,7 @@ export default function SuperAdminDashboard() {
 
   const fetchPlatformStats = useCallback(async () => {
     try {
-      const res = await API.get(`/superadmin/platform-stats?year=${selectedYear}`);
+      const res = await API.get(`/admin/superadmin/platform-stats?year=${selectedYear}`);
       setPlatformStats(res.data.data);
     } catch (err) {
       console.error('Gagal memuat statistik platform', err);
@@ -77,8 +77,8 @@ export default function SuperAdminDashboard() {
   const fetchAdministrators = useCallback(async () => {
     try {
       const url = adminRoleFilter
-        ? `/superadmin/administrators?role=${adminRoleFilter}`
-        : '/superadmin/administrators';
+        ? `/admin/superadmin/administrators?role=${adminRoleFilter}`
+        : '/admin/superadmin/administrators';
       const res = await API.get(url);
       setAdministrators(res.data.data);
     } catch (err) {
@@ -88,7 +88,7 @@ export default function SuperAdminDashboard() {
 
   const fetchUsers = useCallback(async () => {
     try {
-      const res = await API.get('/superadmin/users');
+      const res = await API.get('/admin/superadmin/users');
       setUsers(res.data.data);
     } catch (err) {
       console.error('Gagal memuat data user', err);
@@ -97,7 +97,7 @@ export default function SuperAdminDashboard() {
 
   const fetchRevenueData = useCallback(async () => {
     try {
-      const res = await API.get(`/superadmin/admin-revenue?year=${selectedYear}`);
+      const res = await API.get(`/admin/superadmin/admin-revenue?year=${selectedYear}`);
       setRevenueData(res.data.data);
     } catch (err) {
       console.error('Gagal memuat pendapatan admin', err);
@@ -114,7 +114,7 @@ export default function SuperAdminDashboard() {
         ...(txFilters.admin_id && { admin_id: txFilters.admin_id }),
         ...(txFilters.search && { search: txFilters.search }),
       });
-      const res = await API.get(`/superadmin/transactions?${params.toString()}`);
+      const res = await API.get(`/admin/superadmin/transactions?${params.toString()}`);
       setTransactions(res.data.data.transactions);
       setPagination(res.data.data.pagination);
     } catch (err) {
@@ -124,7 +124,7 @@ export default function SuperAdminDashboard() {
 
   const fetchAdminList = useCallback(async () => {
     try {
-      const res = await API.get('/superadmin/admin-list');
+      const res = await API.get('/admin/superadmin/admin-list');
       setAdminList(res.data.data);
     } catch (err) {
       console.error('Gagal memuat daftar admin', err);
@@ -171,7 +171,7 @@ export default function SuperAdminDashboard() {
       data.append('role', formData.role);
       if (formData.foto) data.append('foto', formData.foto);
 
-      const res = await API.post('/superadmin/administrators', data, {
+      const res = await API.post('/admin/superadmin/administrators', data, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
@@ -211,7 +211,7 @@ export default function SuperAdminDashboard() {
 
     if (result.isConfirmed) {
       try {
-        await API.delete(`/superadmin/administrators/${id}`);
+        await API.delete(`/admin/superadmin/administrators/${id}`);
         Swal.fire('Terhapus!', 'Akun berhasil dihapus.', 'success');
         fetchAdministrators();
         fetchOverviewStats();
@@ -234,7 +234,7 @@ export default function SuperAdminDashboard() {
 
     if (result.isConfirmed) {
       try {
-        await API.delete(`/superadmin/users/${id}`);
+        await API.delete(`/admin/superadmin/users/${id}`);
         Swal.fire('Terhapus!', 'User berhasil dihapus.', 'success');
         fetchUsers();
         fetchOverviewStats();

@@ -136,7 +136,7 @@ function Register() {
         showConfirmButton: false,
         customClass: { popup: 'rounded-2xl' }
       }).then(() => {
-        navigate('/Home');
+        navigate('/beranda');
       });
 
     } catch (error) {

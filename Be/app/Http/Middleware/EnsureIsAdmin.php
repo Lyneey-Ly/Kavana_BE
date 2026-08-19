@@ -12,8 +12,9 @@ class EnsureIsAdmin
     {
         $user = $request->user();
 
-        // Cek apakah akun login dari tabel administrators dan rolenya 'admin'
-        if (!$user || $user->role !== 'admin') {
+        // Akun yang berhak: admin, superadmin, pemilik (owner) properti
+        // (Customer / role lain ditolak)
+        if (!$user || !in_array(strtolower($user->role ?? ''), ['admin', 'superadmin', 'super_admin', 'pemilik', 'owner'])) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Akses ditolak! Fitur ini khusus untuk Admin Platform.'

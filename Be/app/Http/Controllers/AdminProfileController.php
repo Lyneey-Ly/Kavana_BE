@@ -70,7 +70,7 @@ class AdminProfileController extends Controller
             // 💡 Menggunakan 'sometimes' agar jika hanya ganti foto/phone, name & email tidak wajib dikirim ulang
             $request->validate([
                 'name'     => 'sometimes|required|string|max:255',
-                'email'    => 'sometimes|required|email|unique:users,email,' . $admin->id,
+                'email'    => 'sometimes|required|email|unique:' . $admin->getTable() . ',email,' . $admin->id,
                 'phone'    => 'nullable|string|max:20',
                 'password' => 'nullable|string|min:8',
                 'foto'     => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048'

@@ -525,7 +525,7 @@ export default function AdminProfile() {
                     <p className="text-sm font-bold text-[#261C19]">Belum ada unit kamar yang ditambahkan.</p>
                     <p className="text-xs text-slate-500">Mulai tambahkan properti kamar Anda agar dapat disewa oleh penghuni.</p>
                     <Link 
-                      to="/admin/kamar/tambah" 
+                      to="/admin/properti" 
                       className="inline-block text-xs font-extrabold uppercase tracking-wider bg-[#261C19] hover:bg-[#3D2D29] text-white px-5 py-2.5 rounded-xl transition shadow-md mt-2"
                     >
                       ➕ Tambah Kamar Baru

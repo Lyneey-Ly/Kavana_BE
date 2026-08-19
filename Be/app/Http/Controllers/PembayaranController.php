@@ -8,14 +8,35 @@ use App\Models\Pemesanan;
 use App\Models\Properti;
 use App\Models\Kamar;
 use App\Models\FinanceTracker;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class PembayaranController extends Controller
 {
     /**
-     * CUSTOMER: Kirim Bukti Pembayaran (Dengan Validasi Pemilik Pesanan)
+     * Helper Internal: Sinkronisasi Status Properti (Penuh / Tersedia)
+     */
+    private function updatePropertiStatus($propertiId)
+    {
+        if (!$propertiId) return;
+
+        $totalKamar = Kamar::where('properti_id', $propertiId)->count();
+        if ($totalKamar === 0) return;
+
+        $kamarTerisi = Kamar::where('properti_id', $propertiId)
+            ->where('status', 'terisi')
+            ->count();
+
+        $statusBaru = ($kamarTerisi >= $totalKamar) ? 'Penuh' : 'Tersedia';
+        Properti::where('id', $propertiId)->update(['status' => $statusBaru]);
+    }
+
+    /**
+     * CUSTOMER: Kirim Bukti Pembayaran
      */
     public function bayar(Request $request)
     {
@@ -38,7 +59,7 @@ class PembayaranController extends Controller
             return response()->json(['message' => 'Data pemesanan tidak ditemukan'], 404);
         }
 
-        // Proteksi Customer
+        // Proteksi Hak Akses Customer
         if ($pemesanan->customer_id !== $user->id) {
             return response()->json([
                 'message' => 'Forbidden. Anda tidak berhak mengunggah pembayaran untuk pemesanan ini!'
@@ -51,17 +72,18 @@ class PembayaranController extends Controller
             ], 400);
         }
 
-        // Upload file bukti transfer
+        // Simpan file bukti transfer
         $path = $request->file('payment_proof')->store('payment_proofs', 'public');
 
-        // Simpan atau update data pembayaran
+        // Simpan atau perbarui data pembayaran
         $pembayaran = Pembayaran::updateOrCreate(
             ['pemesanan_id' => $pemesanan->id],
             [
                 'amount'         => $request->amount,
                 'payment_method' => $request->payment_method,
                 'payment_proof'  => $path,
-                'payment_date'   => Carbon::now()
+                'payment_date'   => Carbon::now(),
+                'status'         => 'Diverifikasi'
             ]
         );
 
@@ -76,88 +98,98 @@ class PembayaranController extends Controller
     }
 
     /**
-     * 🔒 ADMIN: Konfirmasi Pembayaran & Otomatis Catat ke Finance Tracker
+     * ADMIN: Konfirmasi Pembayaran
      */
-   
+    public function konfirmasi($pemesananId)
+    {
+        $admin = Auth::guard('sanctum')->user();
 
-    /**
- * 🔒 ADMIN: Konfirmasi Pembayaran & Otomatis Catat ke Finance Tracker
- */
-public function konfirmasi($pemesananId)
-{
-    $admin = Auth::guard('sanctum')->user();
+        if (!$admin) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
 
-    if (!$admin) {
-        return response()->json(['message' => 'Unauthenticated'], 401);
-    }
+        $pemesanan = Pemesanan::with(['properti', 'pembayaran'])->find($pemesananId);
 
-    $pemesanan = Pemesanan::with(['properti', 'pembayaran'])->find($pemesananId);
+        if (!$pemesanan) {
+            return response()->json(['message' => 'Data pemesanan tidak ditemukan'], 404);
+        }
 
-    if (!$pemesanan) {
-        return response()->json(['message' => 'Data pemesanan tidak ditemukan'], 404);
-    }
+        // Cek Hak Akses Admin / Pemilik Properti
+        $role = strtolower($admin->role ?? '');
+        $isSuperAdmin = in_array($role, ['superadmin', 'super_admin']);
 
-    // Cek Hak Akses Admin
-    $role = strtolower($admin->role ?? '');
-    $isSuperAdmin = in_array($role, ['superadmin', 'super_admin']);
+        if (!$isSuperAdmin && $pemesanan->properti && $pemesanan->properti->pemilik_id !== $admin->id) {
+            return response()->json([
+                'message' => 'Forbidden. ID Pemilik Properti tidak cocok dengan ID Admin Login!'
+            ], 403);
+        }
 
-    if (!$isSuperAdmin && $pemesanan->properti && $pemesanan->properti->pemilik_id !== $admin->id) {
-        return response()->json([
-            'message' => 'Forbidden. ID Pemilik Properti tidak cocok dengan ID Admin Login!'
-        ], 403);
-    }
+        DB::beginTransaction();
+        try {
+            // 1. Update Status Pemesanan
+            $pemesanan->status = 'Dikonfirmasi';
+            $pemesanan->save();
 
-    // 1. Ubah status pemesanan
-    $pemesanan->update(['status' => 'Dikonfirmasi']);
+            // 2. Update Status Pembayaran
+            if ($pemesanan->pembayaran) {
+                $pemesanan->pembayaran->update([
+                    'status'      => 'Dikonfirmasi',
+                    'verified_at' => Carbon::now(),
+                ]);
+            }
 
-    // 2. OTOMATIS ubah status kamar menjadi 'terisi'
-    if ($pemesanan->kamar_id) {
-        $kamar = Kamar::find($pemesanan->kamar_id);
-        if ($kamar) {
-            $kamar->update(['status' => 'terisi']);
+            // 3. Update Status Kamar menjadi 'terisi' & Sinkronisasi Status Properti
+            if ($pemesanan->kamar_id) {
+                $kamar = Kamar::find($pemesanan->kamar_id);
+                if ($kamar) {
+                    $kamar->update(['status' => 'terisi']);
+                }
+                $this->updatePropertiStatus($pemesanan->properti_id);
+            }
+
+            // 4. Catat Otomatis ke Finance Tracker
+            $nominal = $pemesanan->pembayaran->amount ?? $pemesanan->total_price ?? 0;
+            $namaProperti = $pemesanan->properti->title ?? $pemesanan->properti->nama_properti ?? 'Hunian Kost';
+
+            $finance = FinanceTracker::create([
+                'user_id'     => $pemesanan->customer_id,
+                'type'        => 'pengeluaran',
+                'description' => 'Pembayaran Sewa ' . $namaProperti,
+                'amount'      => $nominal,
+                'category'    => 'Tagihan Kost',
+                'date'        => now()->toDateString(),
+            ]);
+
+            // NOTIFIKASI: ke Customer bahwa pembayaran telah dikonfirmasi
+            NotificationService::send(
+                $pemesanan->customer_id,
+                'Pembayaran Dikonfirmasi',
+                'Pembayaran sewa Anda telah diverifikasi oleh Admin. Selamat menempati kamar!',
+                '/riwayattransaksi',
+                'pembayaran'
+            );
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Pembayaran berhasil dikonfirmasi, kamar diset terisi, dan terdata di Finance Tracker!',
+                'data'    => $pemesanan->load(['pembayaran', 'properti', 'kamar']),
+                'finance' => $finance
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Gagal memproses konfirmasi pembayaran: ' . $e->getMessage());
+
+            return response()->json([
+                'message' => 'Gagal mengonfirmasi pembayaran!',
+                'error'   => $e->getMessage()
+            ], 500);
         }
     }
 
-    // 3. 🚀 OTOMATIS CATAT KE FINANCE TRACKER CUSTOMER (DENGAN PENANGANAN ERROR)
-    try {
-        $nominal = $pemesanan->pembayaran->amount ?? $pemesanan->total_price ?? 0;
-        $namaProperti = $pemesanan->properti->title ?? $pemesanan->properti->nama_properti ?? 'Hunian';
-
-        $finance = FinanceTracker::create([
-            'user_id'     => $pemesanan->customer_id,
-            'type'        => 'pengeluaran',
-            'description' => 'Pembayaran Sewa ' . $namaProperti,
-            'amount'      => $nominal,
-            'category'    => 'Tagihan Kost',
-            'date'        => now()->toDateString(),
-        ]);
-
-        return response()->json([
-            'message' => 'Pembayaran berhasil dikonfirmasi dan terdata di Finance Tracker!',
-            'data'    => $pemesanan,
-            'finance' => $finance
-        ], 200);
-
-    } catch (\Exception $e) {
-        // Jika ada kesalahan pada database/model, tampilkan detail errornya di sini
-        return response()->json([
-            'message' => 'Pemesanan dikonfirmasi, TETAPI GAGAL simpan ke Finance Tracker!',
-            'error'   => $e->getMessage()
-        ], 500);
-    }
-
-    Notification::create([
-        'user_id'    => 1, // ID Admin
-        'type'       => 'payment',
-        'title'      => 'Pembayaran Baru',
-        'message'    => 'Pembayaran sewa Unit A1 telah diterima',
-        'target_url' => '/admin/transaksi',
-    ]);
-
-    return response()->json(['message' => 'Pembayaran berhasil']);
-}
     /**
-     * 🔒 ADMIN: Tampilkan Tagihan/Order (Khusus Properti Milik Admin Login)
+     * ADMIN: Tampilkan Tagihan/Order (Khusus Properti Milik Admin Login)
      */
     public function indexTagihanOrder()
     {

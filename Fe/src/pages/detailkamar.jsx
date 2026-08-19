@@ -27,7 +27,6 @@ export default function DetailKamar() {
   const [filterKamar, setFilterKamar] = useState('semua');
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
-  const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
 
   // State Review / Ulasan
   const [reviews, setReviews] = useState([]);
@@ -230,6 +229,70 @@ export default function DetailKamar() {
     if (properti?.id) fetchReviews(properti.id);
   }, [properti?.id]);
 
+  // Auto-lanjut ke pembuatan booking + dokumen sewa
+  // ketika kembali dari halaman Register (alur: Sewa -> Register -> Detail Kamar)
+  const pendingBooking = location.state?.bookingData;
+  const autoBookingApplied = useRef(false);
+
+  useEffect(() => {
+    if (!pendingBooking || autoBookingApplied.current || !properti) return;
+
+    autoBookingApplied.current = true;
+    window.history.replaceState(null, '');
+
+    const checkInDate = pendingBooking.check_in_date || todayStr;
+    const durationMonths = Number(pendingBooking.duration_months) || 1;
+    const kamarId = pendingBooking.kamar_id || null;
+
+    // Restore pilihan tanggal, durasi, & kamar di UI
+    setTimeout(() => {
+      setTanggalMasuk(checkInDate);
+      setDurasiSewa(durationMonths);
+
+      const kamarsArr = Array.isArray(properti.kamars) ? properti.kamars : [];
+      const targetKamar = kamarsArr.find(k => String(k.id) === String(kamarId));
+      if (targetKamar && !checkIsTerisi(targetKamar)) {
+        setSelectedKamar(targetKamar);
+      }
+
+      // Tunggu state ter-flush, lalu lanjut proses booking
+      setTimeout(async () => {
+        if (kamarsArr.length > 0 && !(targetKamar && !checkIsTerisi(targetKamar))) {
+          Swal.fire({
+            icon: 'info',
+            title: 'Pilih Kamar',
+            text: 'Kamar yang Anda pilih sudah tidak tersedia. Silakan klik dan pilih unit kamar lain pada denah kamar!',
+            confirmButtonColor: '#B38E5D',
+          });
+          return;
+        }
+
+        try {
+          Swal.showLoading();
+          const response = await API.post('/pemesanan/booking', {
+            properti_id: properti.id,
+            kamar_id: kamarId,
+            check_in_date: checkInDate,
+            duration_months: durationMonths,
+          });
+          Swal.close();
+          setBookingResponse(response.data?.data || response.data);
+          setShowDokumenModal(true);
+          setIsAgreed(false);
+        } catch (err) {
+          Swal.close();
+          Swal.fire({
+            icon: 'error',
+            title: 'Booking Gagal',
+            text: err.response?.data?.message || 'Terjadi kesalahan saat memproses booking. Silakan coba lagi.',
+            confirmButtonColor: '#2D2321',
+          });
+        }
+      }, 250);
+    }, 100);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [properti]);
+
   // Submit Review
   const handleSubmitReview = async (e) => {
     e.preventDefault();
@@ -281,13 +344,24 @@ export default function DetailKamar() {
   });
 
   // LOGIKA CANVAS TANDA TANGAN DIGITAL (TTD)
+  const getCanvasCoordinates = (e, canvas) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
+    };
+  };
+
   const startDrawing = (e) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
-    const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+    const { x, y } = getCanvasCoordinates(e, canvas);
     
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
@@ -303,9 +377,7 @@ export default function DetailKamar() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
-    const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+    const { x, y } = getCanvasCoordinates(e, canvas);
     
     ctx.lineTo(x, y);
     ctx.stroke();
@@ -453,7 +525,7 @@ export default function DetailKamar() {
 
       setShowDokumenModal(false);
 
-      Swal.fire({
+      await Swal.fire({
         icon: 'success',
         title: 'Tanda Tangan Tersimpan!',
         text: 'Meneruskan ke halaman pembayaran...',
@@ -461,9 +533,7 @@ export default function DetailKamar() {
         showConfirmButton: false
       });
 
-      setTimeout(() => {
-        navigate('/pembayaran', { state: { itemTransaksi: dataDikirim } });
-      }, 1000);
+      navigate('/pembayaran', { state: { itemTransaksi: dataDikirim } });
 
     } catch (err) {
       Swal.fire({
@@ -512,13 +582,6 @@ export default function DetailKamar() {
   return (
     <div className="min-h-screen bg-[#FAF5EF] text-[#2D2321] font-sans antialiased pb-20 selection:bg-[#B38E5D] selection:text-white relative">
       
-      {/* TOAST NOTIFICATION FLOATING */}
-      {toast.show && (
-        <div className="fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-2xl shadow-xl border flex items-center gap-3 transition-all bg-[#2D2321] text-white border-[#B38E5D]">
-          <span className="text-sm font-bold">{toast.message}</span>
-        </div>
-      )}
-
       {/* LIGHTBOX FOTO MODAL */}
       {isLightboxOpen && (
         <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm animate-fadeIn" onClick={() => setIsLightboxOpen(false)}>
@@ -921,7 +984,6 @@ export default function DetailKamar() {
                 </span>
               </div>
 
-              {/* FORM HANYA MUNCUL JIKA USER SUDAH LOGIN */}
               {isLoggedIn ? (
                 <form onSubmit={handleSubmitReview} className="bg-[#FAF5EF] p-5 rounded-2xl border border-[#D7C4B0]/80 space-y-3.5 shadow-inner">
                   <p className="text-xs font-bold text-[#2D2321]">Bagikan Pengalaman Kamu Tinggal Di Sini:</p>
@@ -959,13 +1021,17 @@ export default function DetailKamar() {
               ) : (
                 <div className="bg-[#FAF5EF] p-4.5 rounded-2xl border border-[#D7C4B0]/80 text-center space-y-2">
                   <p className="text-xs text-[#5C4A42] font-medium">
-                    anda hanya bisa menulis ulasan ketika sudah sewa
+                    Silakan masuk ke akun Anda terlebih dahulu untuk memberikan ulasan.
                   </p>
-                  
+                  <button 
+                    onClick={() => navigate('/login')}
+                    className="text-xs font-bold text-[#B38E5D] hover:underline cursor-pointer"
+                  >
+                    🔑 Masuk / Login
+                  </button>
                 </div>
               )}
 
-              {/* RIWAYAT ULASAN (SELALU TAMPIL) */}
               {loadingReviews ? (
                 <div className="text-center py-6">
                   <div className="w-6 h-6 border-2 border-[#B38E5D] border-t-transparent rounded-full animate-spin mx-auto"></div>

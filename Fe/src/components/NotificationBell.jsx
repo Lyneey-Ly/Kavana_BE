@@ -9,10 +9,10 @@ export default function NotificationBell() {
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
 
-  // Load notifikasi dari backend
+  // Load notifikasi dari backend (global: berlaku untuk Customer & Admin)
   const fetchNotifications = async () => {
     try {
-      const res = await API.get('/admin/notifications');
+      const res = await API.get('/notifications');
       const data = res.data.data;
       setNotifications(data);
       setUnreadCount(data.filter((n) => !n.is_read).length);
@@ -22,7 +22,12 @@ export default function NotificationBell() {
   };
 
   useEffect(() => {
-    fetchNotifications();
+    const timer = setTimeout(fetchNotifications, 0);
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, []);
 
   // Tutup dropdown jika klik di luar
@@ -40,7 +45,7 @@ export default function NotificationBell() {
   const handleItemClick = async (item) => {
     if (!item.is_read) {
       try {
-        await API.patch(`/admin/notifications/${item.id}/read`);
+        await API.patch(`/notifications/${item.id}/read`);
         setNotifications((prev) =>
           prev.map((n) => (n.id === item.id ? { ...n, is_read: true } : n))
         );
@@ -59,7 +64,10 @@ export default function NotificationBell() {
     <div className="relative" ref={dropdownRef}>
       {/* Tombol Lonceng */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen(!isOpen);
+          fetchNotifications();
+        }}
         className="relative p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition shadow-sm"
       >
         <svg className="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">

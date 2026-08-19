@@ -14,6 +14,7 @@ class Kernel extends ConsoleKernel
     {
 
     $schedule->command('sewa:check-expired')->dailyAt('00:00');
+    $schedule->command('notifications:check-kontrak')->dailyAt('08:00');
     }
 
     /**

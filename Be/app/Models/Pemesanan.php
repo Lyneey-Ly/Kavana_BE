@@ -14,14 +14,13 @@ class Pemesanan extends Model
     protected $fillable = [
         'customer_id',
         'properti_id',
+        'kamar_id', // 👈 WAJIB ADA! Agar kamar_id bisa tersimpan saat booking
         'booking_date',
         'check_in_date',
         'duration_months',
         'total_price',
         'status',
     ];
-
-    
 
     public function customer()
     {
@@ -31,6 +30,11 @@ class Pemesanan extends Model
     public function properti()
     {
         return $this->belongsTo(Properti::class, 'properti_id');
+    }
+
+    public function kamar()
+    {
+        return $this->belongsTo(Kamar::class, 'kamar_id');
     }
 
     public function pembayaran()
@@ -47,10 +51,4 @@ class Pemesanan extends Model
     {
         return $this->hasMany(RiwayatStatusPemesanan::class, 'pemesanan_id');
     }
-   
-    public function kamar()
-    {
-        return $this->belongsTo(Kamar::class, 'kamar_id');
-    }
-
 }

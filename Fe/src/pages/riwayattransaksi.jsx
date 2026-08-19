@@ -119,6 +119,8 @@ export default function RiwayatTransaksi() {
       
       const mappedData = dataBackend.map((item) => {
         const properti = item.properti || item.property || {};
+        const kamarObj = item.kamar || properti.kamar || {};
+        const nomorKamarVal = kamarObj.nomor_kamar || item.nomor_kamar || properti.nomor_kamar || null;
         
         // NORMALISASI STATUS
         const statusDb = item.status || 'Tertunda';
@@ -158,10 +160,11 @@ export default function RiwayatTransaksi() {
           
           namaProperti: properti.title || properti.name || properti.nama_properti || properti.nama || '',
           tipeKamar: properti.type || properti.category || properti.tipe_kamar || 'Kamar Standar',
+          nomorKamar: nomorKamarVal ? `Kamar No. ${nomorKamarVal}` : 'Nomor Kamar -',
           
           durasiSewa: `${durasiBulan} Bulan`,
           tanggalMasuk: formatTanggal(item.check_in_date),
-          tanggalKeluar: checkOutFormatted, // 🟢 DATA TANGGAL KELUAR
+          tanggalKeluar: checkOutFormatted,
           
           hargaSewa: formatRupiah(properti.price_per_month || properti.harga),
           biayaLayanan: formatRupiah(item.biaya_layanan || 10000), 
@@ -316,11 +319,20 @@ export default function RiwayatTransaksi() {
                     <div className="md:col-span-2 space-y-3">
                       <div>
                         <h3 className="text-xl font-serif font-bold text-[#2D2321]">{item.namaProperti}</h3>
-                        <p className="text-xs text-[#B38E5D] font-bold">{item.tipeKamar || 'Kamar Standar'}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-xs text-[#B38E5D] font-bold">{item.tipeKamar || 'Kamar Standar'}</p>
+                          <span className="text-xs text-[#2D2321] bg-[#B38E5D]/15 px-2 py-0.5 rounded font-extrabold border border-[#B38E5D]/30">
+                            🚪 {item.nomorKamar}
+                          </span>
+                        </div>
                       </div>
 
                       {/* GRID INFORMASI PEMESANAN & BATAS KONTRAK */}
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-[#FAF5EF] rounded-lg p-3 border border-[#D7C4B0] text-xs">
+                        <div>
+                          <span className="text-[#5C4A42] block text-[10px] uppercase tracking-wider font-bold">Nomor Kamar:</span>
+                          <span className="text-[#B38E5D] font-bold">{item.nomorKamar}</span>
+                        </div>
                         <div>
                           <span className="text-[#5C4A42] block text-[10px] uppercase tracking-wider font-bold">Durasi Sewa:</span>
                           <span className="text-[#2D2321] font-semibold">{item.durasiSewa}</span>
@@ -330,7 +342,7 @@ export default function RiwayatTransaksi() {
                           <span className="text-[#2D2321] font-semibold">{item.tanggalMasuk}</span>
                         </div>
                         
-                        {/* 🟢 TANGGAL KELUAR / BATAS KONTRAK */}
+                        {/* TANGGAL KELUAR / BATAS KONTRAK */}
                         <div>
                           <span className="text-[#B38E5D] block text-[10px] uppercase tracking-wider font-bold">Batas Kontrak:</span>
                           <span className="text-emerald-700 font-bold">{item.tanggalKeluar}</span>
@@ -340,7 +352,7 @@ export default function RiwayatTransaksi() {
                           <span className="text-[#5C4A42] block text-[10px] uppercase tracking-wider font-bold">Metode Bayar:</span>
                           <span className="text-[#2D2321] font-semibold">{item.metodePembayaran}</span>
                         </div>
-                        <div className="sm:col-span-2">
+                        <div>
                           <span className="text-[#5C4A42] block text-[10px] uppercase tracking-wider font-bold">Total Tagihan:</span>
                           <span className="text-[#B38E5D] font-bold text-sm">{item.totalBayar}</span>
                         </div>
@@ -428,15 +440,19 @@ export default function RiwayatTransaksi() {
                   <span className="font-semibold">{selectedStruk.namaProperti}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[#5C4A42]">Unit/Kamar:</span>
+                  <span className="text-[#5C4A42]">Unit/Tipe:</span>
                   <span className="font-semibold">{selectedStruk.tipeKamar || 'Kamar Standar'}</span>
+                </div>
+                <div className="flex justify-between text-[#B38E5D] bg-[#B38E5D]/10 px-2 py-0.5 rounded font-bold">
+                  <span>Nomor Kamar:</span>
+                  <span>{selectedStruk.nomorKamar}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#5C4A42]">Tgl Masuk:</span>
                   <span className="font-semibold">{selectedStruk.tanggalMasuk}</span>
                 </div>
                 
-                {/* 🟢 TANGGAL KELUAR DI STRUK */}
+                {/* TANGGAL KELUAR DI STRUK */}
                 <div className="flex justify-between text-emerald-800 bg-emerald-50 px-2 py-1 rounded">
                   <span className="font-bold">Batas Kontrak:</span>
                   <span className="font-bold">{selectedStruk.tanggalKeluar}</span>

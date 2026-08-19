@@ -12,7 +12,7 @@ use Carbon\Carbon;
 class DokumenSewaController extends Controller
 {
     /**
-     * 🔒 1. ADMIN: Mengambil Daftar Dokumen Sewa Khusus Properti Milik Admin Login
+     * 1. ADMIN: Mengambil Daftar Dokumen Sewa Khusus Properti Milik Admin Login
      * Endpoint: GET /api/admin/dokumen-sewa
      */
     public function indexAdmin()
@@ -23,7 +23,7 @@ class DokumenSewaController extends Controller
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        // Lock keras: Ambil HANYA ID Properti yang dimiliki user ini (misal: Dodo)
+        // Lock keras: Ambil HANYA ID Properti yang dimiliki user ini
         $myPropertyIds = Properti::where('pemilik_id', $user->id)->pluck('id');
 
         // Cari pemesanan Dikonfirmasi KHUSUS properti milik user ini
@@ -39,19 +39,24 @@ class DokumenSewaController extends Controller
                 $startDate = Carbon::parse($p->check_in_date);
                 $endDate = $startDate->copy()->addMonths($p->duration_months);
 
-                $customerName = $p->customer->name ?? 'Penyewa';
-                $propertiTitle = $p->properti->title ?? 'Properti';
-                $propertiAddress = $p->properti->address ?? '-';
+                // ⚡ AMBIL TEMPLATE DARI PROPERTI
+                $agreementText = $p->properti->template_perjanjian;
 
-                $agreementText = "SURAT PERJANJIAN SEWA KOS\n\n"
-                    . "Kami yang bertanda tangan di bawah ini menerangkan bahwa:\n"
-                    . "Nama Penyewa: " . $customerName . "\n"
-                    . "Nama Properti: " . $propertiTitle . "\n"
-                    . "Alamat Properti: " . $propertiAddress . "\n\n"
-                    . "Telah sepakat untuk melakukan sewa menyewa properti selama " . $p->duration_months . " bulan, "
-                    . "terhitung mulai tanggal " . $startDate->toDateString() . " sampai dengan " . $endDate->toDateString() . " "
-                    . "dengan total biaya sebesar Rp " . number_format($p->total_price, 0, ',', '.') . ".\n\n"
-                    . "Perjanjian ini dibuat secara sadar dan tanpa paksaan dari pihak manapun.";
+                if (empty($agreementText)) {
+                    $customerName = $p->customer->name ?? 'Penyewa';
+                    $propertiTitle = $p->properti->title ?? 'Properti';
+                    $propertiAddress = $p->properti->address ?? '-';
+
+                    $agreementText = "SURAT PERJANJIAN SEWA KOS\n\n"
+                        . "Kami yang bertanda tangan di bawah ini menerangkan bahwa:\n"
+                        . "Nama Penyewa: " . $customerName . "\n"
+                        . "Nama Properti: " . $propertiTitle . "\n"
+                        . "Alamat Properti: " . $propertiAddress . "\n\n"
+                        . "Telah sepakat untuk melakukan sewa menyewa properti selama " . $p->duration_months . " bulan, "
+                        . "terhitung mulai tanggal " . $startDate->toDateString() . " sampai dengan " . $endDate->toDateString() . " "
+                        . "dengan total biaya sebesar Rp " . number_format($p->total_price, 0, ',', '.') . ".\n\n"
+                        . "Perjanjian ini dibuat secara sadar dan tanpa paksaan dari pihak manapun.";
+                }
 
                 DokumenSewa::create([
                     'pemesanan_id'    => $p->id,
@@ -77,7 +82,7 @@ class DokumenSewaController extends Controller
     }
 
     /**
-     * 🔒 2. GENERATE DRAF DOKUMEN SEWA
+     * 2. GENERATE DRAF DOKUMEN SEWA
      */
     public function generateDokumen(Request $request)
     {
@@ -113,15 +118,20 @@ class DokumenSewaController extends Controller
         $startDate = Carbon::parse($pemesanan->check_in_date);
         $endDate = $startDate->copy()->addMonths($pemesanan->duration_months);
 
-        $agreementText = "SURAT PERJANJIAN SEWA KOS\n\n"
-            . "Kami yang bertanda tangan di bawah ini menerangkan bahwa:\n"
-            . "Nama Penyewa: " . ($pemesanan->customer->name ?? 'Penyewa') . "\n"
-            . "Nama Properti: " . ($pemesanan->properti->title ?? 'Properti') . "\n"
-            . "Alamat Properti: " . ($pemesanan->properti->address ?? '-') . "\n\n"
-            . "Telah sepakat untuk melakukan sewa menyewa properti selama " . $pemesanan->duration_months . " bulan, "
-            . "terhitung mulai tanggal " . $startDate->toDateString() . " sampai dengan " . $endDate->toDateString() . " "
-            . "dengan total biaya sebesar Rp " . number_format($pemesanan->total_price, 0, ',', '.') . ".\n\n"
-            . "Perjanjian ini dibuat secara sadar dan tanpa paksaan dari pihak manapun.";
+        // ⚡ AMBIL TEMPLATE DARI PROPERTI
+        $agreementText = $pemesanan->properti->template_perjanjian;
+
+        if (empty($agreementText)) {
+            $agreementText = "SURAT PERJANJIAN SEWA KOS\n\n"
+                . "Kami yang bertanda tangan di bawah ini menerangkan bahwa:\n"
+                . "Nama Penyewa: " . ($pemesanan->customer->name ?? 'Penyewa') . "\n"
+                . "Nama Properti: " . ($pemesanan->properti->title ?? 'Properti') . "\n"
+                . "Alamat Properti: " . ($pemesanan->properti->address ?? '-') . "\n\n"
+                . "Telah sepakat untuk melakukan sewa menyewa properti selama " . $pemesanan->duration_months . " bulan, "
+                . "terhitung mulai tanggal " . $startDate->toDateString() . " sampai dengan " . $endDate->toDateString() . " "
+                . "dengan total biaya sebesar Rp " . number_format($pemesanan->total_price, 0, ',', '.') . ".\n\n"
+                . "Perjanjian ini dibuat secara sadar dan tanpa paksaan dari pihak manapun.";
+        }
 
         $dokumen = DokumenSewa::updateOrCreate(
             ['pemesanan_id' => $pemesanan->id],
@@ -139,7 +149,7 @@ class DokumenSewaController extends Controller
     }
 
     /**
-     * 🔒 3. UPLOAD TANDA TANGAN DIGITAL
+     * 3. UPLOAD TANDA TANGAN DIGITAL
      */
     public function uploadTandaTangan(Request $request, $id)
     {
@@ -157,6 +167,13 @@ class DokumenSewaController extends Controller
 
         if (!$dokumen) {
             return response()->json(['message' => 'Dokumen sewa tidak ditemukan'], 404);
+        }
+
+        // 🔒 PROTEKSI IMMUTABILITY: Tolak jika kedua belah pihak sudah bertanda tangan
+        if ($dokumen->customer_signature && $dokumen->admin_signature) {
+            return response()->json([
+                'message' => 'Dokumen ini sudah SAH secara hukum dan tidak dapat diubah lagi!'
+            ], 422);
         }
 
         $path = $request->file('signature')->store('signatures', 'public');
@@ -192,10 +209,10 @@ class DokumenSewaController extends Controller
     }
 
     /**
-     * 🔒 4. LIHAT DETAIL DOKUMEN SEWA
+     * 4. LIHAT DETAIL DOKUMEN SEWA
      * Endpoint: GET /api/dokumen-sewa/{id}
      */
-       public function show($id)
+    public function show($id)
     {
         $user = Auth::guard('sanctum')->user();
 
@@ -238,14 +255,15 @@ class DokumenSewaController extends Controller
             'data'    => $dokumen
         ], 200);
     }
-        /**
-         * 🔒 5. USER: Mengambil Semua Daftar Dokumen Sewa Penyewa
-         */
-        public function indexUser()
-        {
-            $user = Auth::guard('sanctum')->user();
 
-            if (!$user) {
+    /**
+     * 5. USER: Mengambil Semua Daftar Dokumen Sewa Penyewa
+     */
+    public function indexUser()
+    {
+        $user = Auth::guard('sanctum')->user();
+
+        if (!$user) {
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
@@ -262,4 +280,67 @@ class DokumenSewaController extends Controller
             'data'    => $dokumens
         ], 200);
     }
-}
+
+    /**
+     * 6. ADMIN: Mengedit Teks Surat Perjanjian Sewa
+     * Endpoint: PUT /api/admin/dokumen-sewa/{id}
+     */
+    public function update(Request $request, $id)
+    {
+        $user = Auth::guard('sanctum')->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        $dokumen = DokumenSewa::with('pemesanan.properti')->find($id);
+
+        if (!$dokumen) {
+            return response()->json(['message' => 'Dokumen sewa tidak ditemukan.'], 404);
+        }
+
+        // 🔒 PROTEKSI IMMUTABILITY: Tolak edit jika dokumen sudah SAH / komplit TTD
+        if ($dokumen->customer_signature && $dokumen->admin_signature) {
+            return response()->json([
+                'message' => 'Dokumen ini sudah SAH (ditandatangani kedua pihak) dan tidak dapat diubah lagi!'
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'lease_agreement' => 'required|string',
+            'start_date'      => 'nullable|date',
+            'end_date'        => 'nullable|date|after_or_equal:start_date',
+        ]);
+
+        // Otorisasi: Cek Role Admin atau Pemilik Properti
+        $role = strtolower(trim($user->role ?? ''));
+        $isAdminRole = in_array($role, ['admin', 'owner', 'pengelola', 'administrator', 'superadmin', 'super_admin']);
+        
+        $isPemilik = false;
+        if ($dokumen->pemesanan && $dokumen->pemesanan->properti) {
+            $isPemilik = ((int)$dokumen->pemesanan->properti->pemilik_id === (int)$user->id);
+        }
+
+        if (!$isAdminRole && !$isPemilik) {
+            return response()->json([
+                'message' => 'Forbidden. Anda tidak memiliki hak akses untuk mengedit dokumen ini.'
+            ], 403);
+        }
+
+        // Update data dokumen
+        $dokumen->lease_agreement = $validated['lease_agreement'];
+        if (!empty($validated['start_date'])) {
+            $dokumen->start_date = $validated['start_date'];
+        }
+        if (!empty($validated['end_date'])) {
+            $dokumen->end_date = $validated['end_date'];
+        }
+        
+        $dokumen->save();
+
+        return response()->json([
+            'message' => 'Dokumen sewa berhasil diperbarui!',
+            'data'    => $dokumen
+        ], 200);
+    }
+}   

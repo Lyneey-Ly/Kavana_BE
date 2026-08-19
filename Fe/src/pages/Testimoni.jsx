@@ -54,10 +54,10 @@ export default function Testimoni() {
         setCurrentUser(JSON.parse(storedUser));
       }
       
-      // Ambil data user resmi dari backend jika endpoint tersedia
-      const res = await API.get('/user');
-      if (res.data) {
-        setCurrentUser(res.data);
+      // Ambil data user resmi dari backend (endpoint /api/profile)
+      const res = await API.get('/profile');
+      if (res.data?.data) {
+        setCurrentUser(res.data.data);
       }
     } catch (err) {
       console.warn('Tidak dapat mengambil data pengguna login:', err);

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom'; 
-import SidebarUser from '../components/sidebaruser'
+import SidebarUser from '../components/SidebarUser'
 
 export default function BantuanUser() {
   const navigate = useNavigate();
@@ -61,7 +61,7 @@ export default function BantuanUser() {
       
       {/* ================= NAVBAR ================= */}
       <nav className="sticky top-0 z-50 bg-white/85 backdrop-blur-md border-b border-[#D7C4B0]/40 px-6 md:px-12 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/Home')}>
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/beranda')}>
           <div className="p-2 rounded-xl bg-[#261C19] text-[#B38E5D]">
             <svg className="w-5 h-5" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M25 20V80H35V53L55 80H68L45 49L65 20H52L35 43V20H25Z" fill="currentColor" />

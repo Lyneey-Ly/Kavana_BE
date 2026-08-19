@@ -154,6 +154,7 @@ export default function DokumenSewa() {
   };
 
   const customerSig = dokumen?.customer_signature || dokumen?.signature;
+  const nomorKamarDokumen = dokumen?.pemesanan?.kamar?.nomor_kamar || dokumen?.pemesanan?.nomor_kamar || dokumen?.kamar?.nomor_kamar || '-';
 
   return (
     <SidebarUser>
@@ -194,7 +195,7 @@ export default function DokumenSewa() {
               <div className="flex flex-wrap gap-2">
                 {listDokumen.map((docItem, index) => {
                   const isSelected = dokumen?.id === docItem.id;
-                  const nomorKamar = docItem.pemesanan?.kamar?.nomor_kamar;
+                  const nomorKamarTab = docItem.pemesanan?.kamar?.nomor_kamar || docItem.pemesanan?.nomor_kamar || '-';
                   const namaProperti = docItem.pemesanan?.properti?.title || `Unit #${index + 1}`;
                   const isSigned = docItem.customer_signature || docItem.signature;
 
@@ -209,7 +210,7 @@ export default function DokumenSewa() {
                       }`}
                     >
                       <span>🏢 {namaProperti}</span>
-                      {nomorKamar && <span className="opacity-80">(Kamar {nomorKamar})</span>}
+                      <span className="opacity-80 font-mono">(Kamar No. {nomorKamarTab})</span>
                       {isSigned && docItem.admin_signature ? (
                         <span className="text-emerald-400 text-[10px]">✓ Sah</span>
                       ) : (
@@ -275,6 +276,14 @@ export default function DokumenSewa() {
                   <h4 className="text-xs font-extrabold uppercase tracking-widest text-[#C5A059]">Rincian Ringkas Sewa</h4>
                   <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
                     <div>
+                      <span className="text-slate-400 block font-medium">Nomor Kamar</span>
+                      <strong className="text-[#C5A059] font-bold">Kamar No. {nomorKamarDokumen}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block font-medium">Durasi Sewa</span>
+                      <strong className="text-[#261C19] font-bold">{dokumen.pemesanan?.duration_months} Bulan</strong>
+                    </div>
+                    <div>
                       <span className="text-slate-400 block font-medium">Tanggal Mulai (Check-in)</span>
                       <strong className="text-[#261C19] font-bold">{formatDate(dokumen.start_date)}</strong>
                     </div>
@@ -282,13 +291,9 @@ export default function DokumenSewa() {
                       <span className="text-slate-400 block font-medium">Tanggal Selesai</span>
                       <strong className="text-[#261C19] font-bold">{formatDate(dokumen.end_date)}</strong>
                     </div>
-                    <div>
-                      <span className="text-slate-400 block font-medium">Durasi Sewa</span>
-                      <strong className="text-[#C5A059] font-bold">{dokumen.pemesanan?.duration_months} Bulan</strong>
-                    </div>
-                    <div>
+                    <div className="col-span-2">
                       <span className="text-slate-400 block font-medium">Total Biaya Lunas</span>
-                      <strong className="text-[#261C19] font-bold">{formatRupiah(dokumen.pemesanan?.total_price)}</strong>
+                      <strong className="text-[#261C19] font-bold text-sm">{formatRupiah(dokumen.pemesanan?.total_price)}</strong>
                     </div>
                   </div>
                 </div>
@@ -353,7 +358,7 @@ export default function DokumenSewa() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Dokumen ini merupakan bukti hukum yang sah atas hak guna sewa kamar/hunian Anda di Kafana Vista.
+                    Dokumen ini merupakan bukti hukum yang sah atas hak guna sewa Kamar No. <strong>{nomorKamarDokumen}</strong> di Kafana Vista.
                   </p>
                 </div>
 
@@ -369,104 +374,121 @@ export default function DokumenSewa() {
                         type="button"
                         onClick={() => setSigMode('draw')}
                         className={`flex-1 text-xs font-bold py-2 rounded-lg transition ${
-                          sigMode === 'draw' ? 'bg-[#261C19] text-white shadow-xs' : 'text-slate-500 hover:text-[#261C19]'
+                          sigMode === 'draw' 
+                            ? 'bg-white shadow text-[#261C19]' 
+                            : 'text-slate-500 hover:bg-white/50 hover:text-[#261C19]'
                         }`}
                       >
-                        ✍️ Corat-coret Canvas
+                        ✍️ Gambar TTD
                       </button>
                       <button 
                         type="button"
                         onClick={() => setSigMode('upload')}
                         className={`flex-1 text-xs font-bold py-2 rounded-lg transition ${
-                          sigMode === 'upload' ? 'bg-[#261C19] text-white shadow-xs' : 'text-slate-500 hover:text-[#261C19]'
+                          sigMode === 'upload' 
+                            ? 'bg-white shadow text-[#261C19]' 
+                            : 'text-slate-500 hover:bg-white/50 hover:text-[#261C19]'
                         }`}
                       >
-                        📁 Upload Gambar PNG
+                        📁 Upload Foto TTD
                       </button>
                     </div>
 
-                    <form onSubmit={handleUploadSignature} className="space-y-4">
-                      
-                      {sigMode === 'draw' && (
-                        <div className="space-y-2">
-                          <div className="border-2 border-dashed border-[#C5A059]/50 rounded-2xl bg-[#FAF6F0]/30 overflow-hidden relative">
-                            <SignatureCanvas 
-                              ref={sigCanvasRef}
-                              canvasProps={{ className: 'w-full h-44 cursor-crosshair' }}
-                              penColor="#261C19"
-                            />
-                            <button 
-                              type="button"
-                              onClick={clearCanvas}
-                              className="absolute top-2 right-2 bg-rose-100 hover:bg-rose-200 text-rose-800 text-[10px] font-bold px-2.5 py-1 rounded-md transition"
-                            >
-                              🗑️ Bersihkan
-                            </button>
-                          </div>
-                          <p className="text-[11px] text-slate-400 italic text-center">Gunakan jari (di HP) atau mouse untuk membuat tanda tangan.</p>
-                        </div>
-                      )}
-
-                      {sigMode === 'upload' && (
-                        <div className="space-y-3">
-                          <div 
-                            onClick={() => fileInputRef.current?.click()}
-                            className="border-2 border-dashed border-[#C5A059]/50 hover:bg-[#FAF6F0]/50 p-6 rounded-2xl text-center cursor-pointer transition space-y-2"
-                          >
-                            <span className="text-3xl block">📤</span>
-                            <span className="text-xs font-bold text-[#261C19] block">Klik untuk memilih file foto TTD</span>
-                            <span className="text-[10px] text-slate-400 block">Format: PNG, JPG (Max 1MB)</span>
-                          </div>
-
-                          <input 
-                            type="file" 
-                            ref={fileInputRef} 
-                            onChange={handleFileChange}
-                            accept="image/png,image/jpeg,image/jpg" 
-                            className="hidden" 
+                    {/* Area input tanda tangan (Canvas / Upload) */}
+                    {sigMode === 'draw' ? (
+                      <div className="space-y-3">
+                        <div className="border border-dashed border-slate-300 rounded-xl bg-slate-50 overflow-hidden">
+                          <SignatureCanvas 
+                            ref={sigCanvasRef}
+                            penColor="#261C19"
+                            canvasProps={{ className: 'w-full h-40 cursor-crosshair' }}
                           />
-
-                          {filePreview && (
-                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
-                              <img src={filePreview} alt="Preview" className="h-10 object-contain" />
-                              <button type="button" onClick={() => { setSelectedFile(null); setFilePreview(null); }} className="text-xs text-rose-600 font-bold">Hapus</button>
-                            </div>
+                        </div>
+                        <div className="flex justify-between items-center px-1">
+                          <span className="text-[10px] text-slate-400">Gunakan mouse atau jari untuk tanda tangan</span>
+                          <button 
+                            type="button" 
+                            onClick={clearCanvas} 
+                            className="text-[10px] text-rose-500 font-bold hover:underline"
+                          >
+                            Hapus & Ulangi
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <input 
+                          type="file" 
+                          accept="image/png, image/jpeg, image/jpg"
+                          onChange={handleFileChange}
+                          ref={fileInputRef}
+                          className="hidden"
+                        />
+                        <div 
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full h-40 border border-dashed border-slate-300 rounded-xl bg-slate-50 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-slate-100 transition"
+                        >
+                          {filePreview ? (
+                            <img src={filePreview} alt="Preview TTD" className="max-h-32 object-contain rounded" />
+                          ) : (
+                            <>
+                              <span className="text-2xl">📸</span>
+                              <span className="text-xs font-bold text-slate-600">Klik untuk Pilih File Tanda Tangan</span>
+                              <span className="text-[10px] text-slate-400">Format: JPG, PNG (Maksimal 1MB)</span>
+                            </>
                           )}
                         </div>
+                        {filePreview && (
+                          <div className="flex justify-end px-1">
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                setSelectedFile(null);
+                                setFilePreview(null);
+                                if(fileInputRef.current) fileInputRef.current.value = '';
+                              }} 
+                              className="text-[10px] text-rose-500 font-bold hover:underline"
+                            >
+                              Hapus File
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <button 
+                      onClick={handleUploadSignature}
+                      disabled={submitting}
+                      className="w-full bg-[#261C19] hover:bg-[#C5A059] text-white py-3.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-md disabled:opacity-50 flex justify-center items-center gap-2"
+                    >
+                      {submitting ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Menyimpan...
+                        </>
+                      ) : (
+                        'Simpan Tanda Tangan'
                       )}
-
-                      <button 
-                        type="submit"
-                        disabled={submitting}
-                        className="w-full py-3.5 bg-gradient-to-r from-[#C5A059] via-[#D4AF37] to-[#9C7A3C] text-[#261C19] font-extrabold text-xs uppercase tracking-widest rounded-xl transition shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        {submitting ? 'Menyimpan...' : '✍️ Simpan & Sahkan Perjanjian'}
-                      </button>
-
-                    </form>
+                    </button>
                   </div>
                 ) : (
-                  <div className="bg-[#261C19] text-[#FAF5EF] p-6 rounded-3xl border border-[#C5A059]/40 shadow-xl space-y-3 text-center">
-                    <span className="text-4xl block">🎉</span>
-                    <h3 className="text-lg font-black text-white">Tanda Tangan Diterima!</h3>
-                    <p className="text-xs text-[#E5D7C5]/80 leading-relaxed">
-                      Anda telah menandatangani dokumen sewa untuk unit ini.
-                    </p>
+                  <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-200 shadow-sm text-center space-y-3 print:hidden">
+                    <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xl mx-auto mb-2">
+                      ✓
+                    </div>
+                    <h3 className="text-sm font-extrabold text-emerald-800">Dokumen Telah Ditandatangani</h3>
+                    <p className="text-xs text-emerald-600">Terima kasih, dokumen ini telah Anda setujui dan sah secara digital.</p>
                   </div>
                 )}
-
               </div>
-
             </div>
-
           ) : (
-            <div className="bg-white p-12 rounded-3xl border border-[#E5D7C5] text-center space-y-3">
-              <span className="text-3xl">❓</span>
-              <h3 className="text-base font-bold text-[#261C19]">Dokumen Tidak Ditemukan</h3>
-              <p className="text-xs text-slate-500">Anda belum memiliki dokumen sewa yang aktif.</p>
+            <div className="bg-white p-16 rounded-3xl border border-[#E5D7C5] text-center space-y-4 shadow-sm">
+              <span className="text-4xl grayscale opacity-40">📄</span>
+              <h3 className="text-base font-bold text-[#261C19]">Belum Ada Dokumen Sewa</h3>
+              <p className="text-xs text-slate-500">Anda belum memiliki dokumen perjanjian sewa yang aktif saat ini.</p>
             </div>
           )}
-
         </div>
       </div>
     </SidebarUser>

@@ -397,6 +397,7 @@ export default function UserProfile() {
                     <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
                       {rentStatus.map((item, index) => {
                         const cleanDuration = String(item.duration_months || '').replace(/bulan/gi, '').trim();
+                        const nomorKamarNum = item.kamar?.nomor_kamar || item.nomor_kamar || item.properti?.nomor_kamar || null;
 
                         return (
                           <div 
@@ -410,11 +411,10 @@ export default function UserProfile() {
                                 <span className="bg-[#261C19] text-[#E5D7C5] text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md shadow-xs">
                                   Verified Resident • Unit #{index + 1}
                                 </span>
-                                {item.kamar?.nomor_kamar && (
-                                  <span className="bg-[#C5A059]/15 text-[#8F6E45] border border-[#C5A059]/30 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md">
-                                    Kamar No. {item.kamar.nomor_kamar}
-                                  </span>
-                                )}
+                                
+                                <span className="bg-[#C5A059]/15 text-[#8F6E45] border border-[#C5A059]/30 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md">
+                                  Kamar No. {nomorKamarNum || '-'}
+                                </span>
                               </div>
 
                               <h4 className="text-base font-black text-[#261C19] group-hover:text-[#C5A059] transition-colors leading-tight">
@@ -427,6 +427,10 @@ export default function UserProfile() {
                               </p>
                               
                               <div className="flex flex-wrap items-center gap-2 pt-1">
+                                <div className="bg-white/90 px-2.5 py-1 rounded-lg border border-slate-200/90 text-[10px] text-slate-600 flex items-center gap-1 shadow-2xs">
+                                  <span>🚪 Kamar:</span>
+                                  <strong className="text-[#261C19] font-bold">No. {nomorKamarNum || '-'}</strong>
+                                </div>
                                 <div className="bg-white/90 px-2.5 py-1 rounded-lg border border-slate-200/90 text-[10px] text-slate-600 flex items-center gap-1 shadow-2xs">
                                   <span>📅 In:</span>
                                   <strong className="text-[#261C19] font-bold">{formatDate(item.check_in_date)}</strong>

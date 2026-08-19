@@ -18,10 +18,31 @@ use Carbon\Carbon;
 class SuperAdminController extends Controller
 {
     /**
+     * Helper: Hanya akun Superadmin yang boleh mengakses fitur manajemen platform
+     */
+    private function isSuperAdmin(Request $request): bool
+    {
+        $user = $request->user();
+        return $user && in_array(strtolower($user->role ?? ''), ['superadmin', 'super_admin']);
+    }
+
+    private function denyAccess(): \Illuminate\Http\JsonResponse
+    {
+        return response()->json([
+            'status'  => 'error',
+            'message' => 'Akses ditolak! Fitur ini khusus untuk Superadmin.'
+        ], 403);
+    }
+
+    /**
      * 📊 1. RINGKASAN STATISTIK PLATFORM
      */
-    public function dashboardStats()
+    public function dashboardStats(Request $request)
     {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
         $totalUsers = User::count();
         // admin = Pemilik Kost
         $totalPemilik = Administrator::where('role', 'admin')->count(); 
@@ -43,6 +64,10 @@ class SuperAdminController extends Controller
      */
     public function getAdministrators(Request $request)
     {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
         $superadminQuery = Administrator::query();
 
         if ($request->has('role') && in_array($request->role, ['admin', 'superadmin'])) {
@@ -59,6 +84,10 @@ class SuperAdminController extends Controller
 
     public function storeAdministrator(Request $request)
     {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
         // Hanya izinkan 'admin' (Pemilik Kost) dan 'superadmin'
         $request->validate([
             'name'     => 'required|string|max:100',
@@ -92,6 +121,10 @@ class SuperAdminController extends Controller
 
     public function destroyAdministrator(Request $request, $id)
     {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
         $currentUser = $request->user();
         $targetAccount = Administrator::find($id);
 
@@ -118,8 +151,12 @@ class SuperAdminController extends Controller
     /**
      * 📱 3. KELOLA DATA USER TERDAFTAR
      */
-    public function getUsers()
+    public function getUsers(Request $request)
     {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
         $userList = User::orderBy('created_at', 'desc')->get();
 
         return response()->json([
@@ -129,8 +166,12 @@ class SuperAdminController extends Controller
         ], 200);
     }
 
-    public function destroyUser($id)
+    public function destroyUser(Request $request, $id)
     {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
         $user = User::find($id);
 
         if (!$user) {
@@ -150,6 +191,10 @@ class SuperAdminController extends Controller
      */
     public function adminRevenue(Request $request)
     {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
         $year = $request->get('year', Carbon::now()->year);
         $month = $request->get('month'); // Optional, null = all months
 
@@ -222,6 +267,10 @@ class SuperAdminController extends Controller
      */
     public function platformStats(Request $request)
     {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
         $year = $request->get('year', Carbon::now()->year);
 
         // Monthly revenue for the whole platform
@@ -367,6 +416,10 @@ class SuperAdminController extends Controller
      */
     public function allTransactions(Request $request)
     {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
         $query = Pemesanan::query()
             ->with(['customer', 'properti.pemilik', 'kamar', 'pembayaran'])
             ->orderBy('created_at', 'desc');
@@ -455,8 +508,12 @@ class SuperAdminController extends Controller
     /**
      * 📋 7. LIST ADMIN UNTUK FILTER
      */
-    public function adminList()
+    public function adminList(Request $request)
     {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
         $admins = Administrator::where('role', 'admin')
             ->select('id', 'name', 'email')
             ->orderBy('name')

@@ -30,6 +30,11 @@ export default function AdminDokumenSewa() {
   const [adminSigError, setAdminSigError] = useState(false);
   const [tenantSigError, setTenantSigError] = useState(false);
 
+  // STATE EDIT TEKS PERJANJIAN SEWA
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedAgreementText, setEditedAgreementText] = useState('');
+  const [savingAgreement, setSavingAgreement] = useState(false);
+
   const storageBaseUrl = import.meta.env.VITE_STORAGE_BASE_URL || 'http://localhost:8000/storage';
 
   // Helper Sanitasi URL Gambar TTD
@@ -60,7 +65,7 @@ export default function AdminDokumenSewa() {
     } catch (error) {
       console.error('Gagal mengambil daftar dokumen:', error);
       setErrorMessage('Gagal memuat daftar dokumen sewa penyewa.');
-    } finally {
+    } {
       setLoading(false);
     }
   };
@@ -207,6 +212,28 @@ export default function AdminDokumenSewa() {
       setErrorMessage('Gagal menyimpan tanda tangan admin.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // HANDLER: Simpan Perubahan Teks Perjanjian
+  const handleSaveAgreementText = async () => {
+    try {
+      setSavingAgreement(true);
+      setErrorMessage('');
+      setSuccessMessage('');
+
+      const res = await API.put(`/admin/dokumen-sewa/${dokumen.id}`, {
+        lease_agreement: editedAgreementText
+      });
+
+      setDokumen({ ...dokumen, lease_agreement: editedAgreementText });
+      setSuccessMessage(res.data?.message || 'Teks perjanjian berhasil diperbarui!');
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Gagal menyimpan pembaruan teks:', error);
+      setErrorMessage(error.response?.data?.message || 'Gagal menyimpan pembaruan dokumen sewa.');
+    } finally {
+      setSavingAgreement(false);
     }
   };
 
@@ -540,9 +567,71 @@ export default function AdminDokumenSewa() {
                   </p>
                 </div>
 
-                {/* ISI SURAT KONTRAK */}
-                <div className="bg-[#FAF6F0] p-6 sm:p-8 rounded-2xl border border-[#E5D7C5] text-xs sm:text-sm leading-relaxed text-[#261C19] whitespace-pre-line font-serif shadow-inner">
-                  {dokumen.lease_agreement}
+                {/* ISI SURAT KONTRAK & FORM EDIT */}
+                <div className="space-y-4">
+                  {!isEditing ? (
+                    <>
+                      <div className="bg-[#FAF6F0] p-6 sm:p-8 rounded-2xl border border-[#E5D7C5] text-xs sm:text-sm leading-relaxed text-[#261C19] whitespace-pre-line font-serif shadow-inner">
+                        {dokumen.lease_agreement}
+                      </div>
+
+                      {/* TOMBOL MASUK MODE EDIT */}
+                      <div className="flex justify-end print:hidden">
+                        <button 
+                          onClick={() => {
+                            setEditedAgreementText(dokumen.lease_agreement);
+                            setIsEditing(true);
+                          }}
+                          className="text-xs font-bold text-[#C5A059] bg-[#FAF6F0] border border-[#C5A059] px-4 py-2.5 rounded-xl hover:bg-[#C5A059] hover:text-white transition cursor-pointer flex items-center gap-2 shadow-xs active:scale-95"
+                        >
+                          <span>✏️</span>
+                          <span>Edit Teks Perjanjian</span>
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    /* FORM TEXTAREA SAAT MODE EDIT */
+                    <div className="space-y-3 bg-[#FAF6F0]/50 p-4 rounded-2xl border-2 border-dashed border-[#C5A059]/40 print:hidden">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-[#C5A059]">
+                          Mode Edit Perjanjian
+                        </label>
+                      </div>
+                      <textarea
+                        value={editedAgreementText}
+                        onChange={(e) => setEditedAgreementText(e.target.value)}
+                        rows={12}
+                        placeholder="Tuliskan draft dokumen perjanjian di sini..."
+                        className="w-full bg-white p-5 rounded-xl border border-[#E5D7C5] text-xs sm:text-sm leading-relaxed text-[#261C19] font-serif focus:outline-none focus:ring-2 focus:ring-[#C5A059] transition"
+                      />
+                      <div className="flex justify-end gap-3 pt-2">
+                        <button
+                          onClick={() => setIsEditing(false)}
+                          disabled={savingAgreement}
+                          className="text-xs font-bold text-slate-500 bg-white border border-slate-300 px-5 py-2.5 rounded-xl hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
+                        >
+                          ❌ Batal
+                        </button>
+                        <button
+                          onClick={handleSaveAgreementText}
+                          disabled={savingAgreement}
+                          className="text-xs font-bold text-white bg-[#261C19] hover:bg-[#3D2D29] px-5 py-2.5 rounded-xl transition cursor-pointer flex items-center gap-2 disabled:opacity-50 shadow-md active:scale-95"
+                        >
+                          {savingAgreement ? (
+                            <>
+                              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              <span>Menyimpan...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>💾</span>
+                              <span>Simpan Perubahan</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* RINCIAN KEUANGAN & TANGGAL */}

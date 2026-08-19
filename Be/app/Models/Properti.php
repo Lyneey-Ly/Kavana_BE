@@ -18,6 +18,8 @@ class Properti extends Model
         'gender_type', 
         'price_per_month',
         'address',
+        'latitude',          // 👈 Tambahkan ini
+        'longitude',         // 👈 Tambahkan ini
         'facilities',
         'status',
         'main_image',
@@ -25,10 +27,13 @@ class Properti extends Model
         'description',
         'public_facilities',
         'rules',
+        'template_perjanjian',
     ];
 
     protected $casts = [
         'gallery_images' => 'array',
+        'latitude'       => 'float', // 👈 Konversi ke float/number untuk Leaflet
+        'longitude'      => 'float', // 👈 Konversi ke float/number untuk Leaflet
     ];
 
     public function pemilik()
@@ -52,7 +57,4 @@ class Properti extends Model
     {
         return $this->hasMany(Chat::class, 'properti_id');
     }
-
-    
-
 }

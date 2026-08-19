@@ -7,6 +7,7 @@ use App\Models\Pemesanan;
 use App\Models\Properti;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class ChatController extends Controller
 {
@@ -50,8 +51,11 @@ class ChatController extends Controller
     {
         try {
             $request->validate([
-                'receiver_id' => 'required|exists:users,id',
-                'message'     => 'required|string',
+                'receiver_id' => [
+                    'required',
+                    Rule::exists('users', 'id')->orWhere(Rule::exists('administrators', 'id'))
+                ],
+                'message' => 'required|string',
             ]);
 
             $chat = Chat::create([

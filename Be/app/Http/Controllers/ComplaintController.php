@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Complaint;
 use App\Models\Properti;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -44,6 +45,21 @@ class ComplaintController extends Controller
         ]);
 
         $complaint->load(['user', 'properti', 'kamar']);
+
+        // NOTIFIKASI: ke Admin Properti bahwa ada komplain baru
+        if ($complaint->properti && $complaint->properti->pemilik_id) {
+            $nomorKamar = $complaint->kamar
+                ? ($complaint->kamar->nomor_kamar ?? $complaint->kamar->nama_kamar ?? '-')
+                : '-';
+
+            NotificationService::send(
+                $complaint->properti->pemilik_id,
+                'Komplain Baru',
+                "Penyewa kamar {$nomorKamar} mengajukan komplain: {$complaint->judul}",
+                '/admin/komplain',
+                'komplain'
+            );
+        }
 
         return response()->json([
             'message' => 'Komplain berhasil dikirim! Tim kami akan segera mengeceknya.',
@@ -143,6 +159,15 @@ class ComplaintController extends Controller
             'status'          => $request->status,
             'tanggapan_admin' => $request->tanggapan_admin ?? $complaint->tanggapan_admin
         ]);
+
+        // NOTIFIKASI: ke Customer bahwa komplain-nya telah ditanggapi
+        NotificationService::send(
+            $complaint->user_id,
+            'Komplain Ditanggapi',
+            "Komplain Anda terkait '{$complaint->judul}' telah diperbarui statusnya menjadi {$request->status}.",
+            '/komplain',
+            'komplain'
+        );
 
         return response()->json([
             'message' => 'Status komplain berhasil diperbarui!',

@@ -232,7 +232,7 @@ export default function Pembayaran() {
           <h2 className="text-lg font-bold text-[#2D2321]">Transaksi Tidak Ditemukan</h2>
           <p className="text-xs text-[#5C4A42]">Tidak ada data pemesanan yang aktif untuk dibayar saat ini.</p>
           <button 
-            onClick={() => navigate('/Home')} 
+onClick={() => navigate('/beranda')}
             className="w-full bg-[#2D2321] text-white py-3 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-[#B38E5D] transition cursor-pointer"
           >
             Kembali ke Beranda
@@ -264,7 +264,7 @@ export default function Pembayaran() {
         {/* HEADER & TOMBOL KEMBALI */}
         <div className="mb-8 animate-fade-up space-y-3">
           <button
-            onClick={() => navigate('/Home')}
+            onClick={() => navigate('/beranda')}
             className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#5C4A42] hover:text-[#B38E5D] transition-all duration-200 cursor-pointer group hover:-translate-x-1"
           >
             <span className="text-base transition-transform group-hover:-translate-x-1">←</span>

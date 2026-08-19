@@ -20,6 +20,7 @@ class DokumenSewa extends Model
     'admin_signature',
     'status',
     'signed_at',
+    'template_perjanjian', // Tambahkan kolom ini
     ];
 
     // Relasi balik ke Pemesanan

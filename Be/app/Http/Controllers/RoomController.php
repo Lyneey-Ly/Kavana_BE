@@ -3,14 +3,16 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Kamar; // 🟢 Perbaikan: Gunakan PascalCase (Kamar) untuk mencegah error pada server Linux / Production
+use App\Models\Kamar;
 use App\Models\Properti;
+use App\Models\Pemesanan;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class RoomController extends Controller
 {
     /**
-     * 🔒 Helper internal untuk mengecek apakah user login berhak mengakses properti ini
+     * 🔒 Helper internal untuk mengecek akses properti
      */
     private function checkPropertyAccess($propertiId)
     {
@@ -27,7 +29,6 @@ class RoomController extends Controller
         $role = strtolower($user->role ?? '');
         $isSuperAdmin = in_array($role, ['superadmin', 'super_admin']);
 
-        // Jika bukan Superadmin dan bukan pemilik properti ini, tolak akses!
         if (!$isSuperAdmin && $properti->pemilik_id !== $user->id) {
             return ['status' => false, 'code' => 403, 'message' => 'Forbidden. Anda tidak memiliki akses ke kamar di properti ini!'];
         }
@@ -36,7 +37,7 @@ class RoomController extends Controller
     }
 
     /**
-     * 1. Ambil daftar kamar berdasarkan Properti ID (Terkunci per Pemilik)
+     * 1. Ambil daftar kamar berdasarkan Properti ID (dengan flag is_available)
      */
     public function index($propertiId)
     {
@@ -45,7 +46,18 @@ class RoomController extends Controller
             return response()->json(['message' => $check['message']], $check['code']);
         }
 
-        $rooms = Kamar::where('properti_id', $propertiId)->get();
+        $rooms = Kamar::where('properti_id', $propertiId)->get()->map(function ($kamar) {
+            $hasActiveBooking = Pemesanan::where('kamar_id', $kamar->id)
+                ->whereIn('status', ['Tertunda', 'Diverifikasi', 'Dikonfirmasi'])
+                ->where(function ($q) {
+                    $q->whereNull('expired_at')->orWhere('expired_at', '>', Carbon::now());
+                })
+                ->exists();
+
+            $kamar->is_available = (strtolower($kamar->status) === 'kosong') && !$hasActiveBooking;
+            return $kamar;
+        });
+
         return response()->json($rooms, 200);
     }
 
@@ -64,7 +76,6 @@ class RoomController extends Controller
             'status'      => 'nullable|string|in:kosong,terisi,Tersedia,Terisi',
         ]);
 
-        // Normalisasi status input
         $status = strtolower($request->status ?? 'kosong');
         if ($status === 'tersedia') $status = 'kosong';
 
@@ -81,7 +92,7 @@ class RoomController extends Controller
     }
 
     /**
-     * 3. Update status / nomor kamar (Akses Terkunci)
+     * 3. Update status / nomor kamar
      */
     public function update(Request $request, $id)
     {
@@ -91,7 +102,6 @@ class RoomController extends Controller
             return response()->json(['message' => 'Data kamar tidak ditemukan'], 404);
         }
 
-        // Cek hak akses ke properti induk tempat kamar ini berada
         $check = $this->checkPropertyAccess($room->properti_id);
         if (!$check['status']) {
             return response()->json(['message' => $check['message']], $check['code']);
@@ -122,7 +132,7 @@ class RoomController extends Controller
     }
 
     /**
-     * 4. Hapus unit kamar (Akses Terkunci)
+     * 4. Hapus unit kamar
      */
     public function destroy($id)
     {
@@ -132,7 +142,6 @@ class RoomController extends Controller
             return response()->json(['message' => 'Data kamar tidak ditemukan'], 404);
         }
 
-        // Cek hak akses ke properti induk tempat kamar ini berada
         $check = $this->checkPropertyAccess($room->properti_id);
         if (!$check['status']) {
             return response()->json(['message' => $check['message']], $check['code']);
