@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+<<<<<<< HEAD
 import API from '../api'; 
 import SidebarAdmin from '../components/SidebarAdmin';
 import Swal from 'sweetalert2';
@@ -24,6 +25,18 @@ export default function AdminDataProperti() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+=======
+import API from '../api'; // Pastikan path ini sesuai
+import SidebarAdmin from '../components/SidebarAdmin';
+import Swal from 'sweetalert2';
+
+export default function AdminDataProperti() {
+  // 1. STATE DATA & LOADING
+  const [rooms, setRooms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
   // 2. STATE UNTUK MODAL PROPERTI (CREATE & UPDATE)
   const [isModalOpen, setIsModalOpen] = useState(false);
   
@@ -35,21 +48,34 @@ export default function AdminDataProperti() {
   const [galleryFiles, setGalleryFiles] = useState([]);
   const [galleryPreviews, setGalleryPreviews] = useState([]);
 
+<<<<<<< HEAD
   // FORM DATA (Termasuk lease_agreement untuk dokumen sewa)
+=======
+  // FORM DATA (Menggunakan display_price untuk format titik ribuan)
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
   const [formData, setFormData] = useState({
     id: null,
     title: '',
     type: 'Kost',
     gender_type: 'male',
+<<<<<<< HEAD
     price_per_month: '',
+=======
+    price_per_month: '',     // Angka murni (misal: 1500000)
+    display_price: '',       // Angka berformat (misal: 1.500.000)
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
     address: '',
     facilities: '',
     public_facilities: '',
     rules: '',
     description: '',
     status: 'Tersedia',
+<<<<<<< HEAD
     main_image: '',
     lease_agreement: ''
+=======
+    main_image: ''
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
   });
 
   // 3. STATE UNTUK MODAL KELOLA UNIT KAMAR
@@ -59,6 +85,17 @@ export default function AdminDataProperti() {
   const [newRoomNumber, setNewRoomNumber] = useState('');
   const [loadingRooms, setLoadingRooms] = useState(false);
 
+<<<<<<< HEAD
+=======
+  // HELPER FORMATTER angka ke format titik (Indonesia)
+  const formatNumberWithDot = (val) => {
+    if (!val && val !== 0) return '';
+    const cleanStr = String(val).replace(/\D/g, '');
+    if (!cleanStr) return '';
+    return Number(cleanStr).toLocaleString('id-ID');
+  };
+
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
   // Fetch Data dari API Backend (READ)
   const fetchProperties = useCallback(async () => {
     try {
@@ -99,6 +136,7 @@ export default function AdminDataProperti() {
       type: 'Kost',
       gender_type: 'male',
       price_per_month: '',
+      display_price: '',
       address: '',
       facilities: '',
       public_facilities: '',
@@ -200,7 +238,14 @@ export default function AdminDataProperti() {
       confirmButtonText: 'Ya, Hapus!',
       cancelButtonText: 'Batal'
     });
+    setImageFile(null);
+    setImagePreview(null);
+    setGalleryFiles([]);
+    setGalleryPreviews([]);
+    setIsModalOpen(true);
+  };
 
+<<<<<<< HEAD
     if (result.isConfirmed) {
       try {
         await API.delete(`/admin/properties/${id}`);
@@ -262,6 +307,162 @@ export default function AdminDataProperti() {
         await API.post(`/admin/properties/${formData.id}`, data);
       } else {
         await API.post('/admin/properties', data);
+=======
+  const handleOpenEdit = (room) => {
+    const rawPrice = room.price_per_month || '';
+    setFormData({
+      id: room.id,
+      title: room.title || '',
+      type: room.type || 'Kost',
+      gender_type: room.gender_type || 'male',
+      price_per_month: rawPrice,
+      display_price: formatNumberWithDot(rawPrice),
+      address: room.address || '',
+      facilities: room.facilities || '',
+      public_facilities: room.public_facilities || room.fasilitas_bersama || '',
+      rules: room.rules || room.aturan || room.aturan_kos || '',
+      description: room.description || '',
+      status: room.status || 'Tersedia',
+      main_image: room.main_image || ''
+    });
+    setImageFile(null);
+    setImagePreview(room.main_image ? getImageUrl(room.main_image) : null);
+    
+    setGalleryFiles([]);
+    let rawGallery = room.gallery_images || room.images || room.galleries || [];
+    
+    if (typeof rawGallery === 'string') {
+      try {
+        rawGallery = JSON.parse(rawGallery);
+      } catch (e) {
+        rawGallery = [];
+      }
+    }
+
+    if (Array.isArray(rawGallery)) {
+      setGalleryPreviews(rawGallery.map(img => getImageUrl(img.image_path || img.image || img)));
+    } else {
+      setGalleryPreviews([]);
+    }
+
+    setIsModalOpen(true);
+  };
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  // Handler Khusus untuk Input Harga dengan Format Titik Ribuan
+  const handlePriceChange = (e) => {
+    const rawVal = e.target.value.replace(/\D/g, ''); // Hapus semua karakter non-angka
+    setFormData({
+      ...formData,
+      price_per_month: rawVal,
+      display_price: formatNumberWithDot(rawVal)
+    });
+  };
+
+  // Handler Foto Utama
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  // Handler Foto Galeri (Multiple)
+  const handleGalleryChange = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+      setGalleryFiles(files);
+      const newPreviews = files.map(file => URL.createObjectURL(file));
+      setGalleryPreviews(newPreviews);
+    }
+  };
+
+  // Hapus satu preview foto dari pilihan galeri baru
+  const handleRemoveGalleryPreview = (indexToRemove) => {
+    setGalleryFiles(prev => prev.filter((_, idx) => idx !== indexToRemove));
+    setGalleryPreviews(prev => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  // Hapus Properti
+  const handleDelete = async (id) => {
+    const result = await Swal.fire({
+      title: 'Hapus Properti?',
+      text: "Data properti beserta seluruh unit kamarnya akan dihapus permanen!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#B38E5D',
+      cancelButtonColor: '#e11d48',
+      confirmButtonText: 'Ya, Hapus!',
+      cancelButtonText: 'Batal'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await API.delete(`/admin/properties/${id}`);
+        setRooms(rooms.filter(room => room.id !== id));
+        
+        Swal.fire({
+          title: 'Terhapus!',
+          text: 'Data properti berhasil dihapus.',
+          icon: 'success',
+          confirmButtonColor: '#B38E5D'
+        });
+      } catch (err) {
+        console.error("Gagal menghapus properti:", err);
+        Swal.fire({
+          title: 'Gagal!',
+          text: 'Gagal menghapus data. Pastikan Anda memiliki hak akses admin.',
+          icon: 'error',
+          confirmButtonColor: '#B38E5D'
+        });
+      }
+    }
+  };
+
+  // Submit Properti
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    const data = new FormData();
+    data.append('title', formData.title);
+    data.append('type', formData.type);
+    data.append('gender_type', formData.gender_type);
+    data.append('price_per_month', formData.price_per_month); // Mengirim angka murni ke Laravel
+    data.append('address', formData.address);
+    data.append('facilities', formData.facilities || '');
+    data.append('public_facilities', formData.public_facilities || '');
+    data.append('rules', formData.rules || '');
+    data.append('description', formData.description || '');
+    data.append('status', formData.status);
+
+    // Foto Utama
+    if (imageFile) {
+      data.append('main_image', imageFile);
+    }
+
+    // Foto Galeri / Ruangan Banyak
+    if (galleryFiles.length > 0) {
+      galleryFiles.forEach((file) => {
+        data.append('gallery_images[]', file);
+      });
+    }
+
+    try {
+      if (formData.id) {
+        data.append('_method', 'PUT');
+        await API.post(`/admin/properties/${formData.id}`, data, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      } else {
+        await API.post('/admin/properties', data, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
       }
 
       setIsModalOpen(false);
@@ -269,7 +470,11 @@ export default function AdminDataProperti() {
       
       Swal.fire({
         title: 'Berhasil!',
+<<<<<<< HEAD
         text: 'Data properti & template dokumen sewa berhasil disimpan.',
+=======
+        text: 'Data properti berhasil disimpan.',
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
         icon: 'success',
         timer: 2000,
         showConfirmButton: false
@@ -287,6 +492,10 @@ export default function AdminDataProperti() {
     }
   };
 
+<<<<<<< HEAD
+=======
+  // ================= LOGIK KELOLA UNIT KAMAR =================
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
   const handleOpenRoomModal = async (property) => {
     setSelectedProperty(property);
     setIsRoomModalOpen(true);
@@ -422,7 +631,11 @@ export default function AdminDataProperti() {
             <div className="flex justify-between items-end mb-6">
               <div>
                 <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Data Kamar / Properti</h1>
+<<<<<<< HEAD
                 <p className="text-slate-500 mt-1">Kelola data properti, unit kamar, dan template dokumen perjanjian sewa.</p>
+=======
+                <p className="text-slate-500 mt-1">Kelola data properti dan nomor unit kamar langsung dari backend.</p>
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
               </div>
               
               <button 
@@ -473,6 +686,10 @@ export default function AdminDataProperti() {
                             <span className="font-semibold">{room.type}</span> ({renderGenderLabel(room.gender_type)})
                           </td>
                           
+<<<<<<< HEAD
+=======
+                          {/* TOMBOL KELOLA KAMAR */}
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
                           <td className="px-6 py-4">
                             <button
                               onClick={() => handleOpenRoomModal(room)}
@@ -493,7 +710,11 @@ export default function AdminDataProperti() {
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center justify-center gap-2">
+<<<<<<< HEAD
                               <button onClick={() => handleOpenEdit(room)} className="p-2 text-slate-400 hover:text-[#B38E5D] rounded transition-colors cursor-pointer" title="Edit Properti & Dokumen">
+=======
+                              <button onClick={() => handleOpenEdit(room)} className="p-2 text-slate-400 hover:text-[#B38E5D] rounded transition-colors cursor-pointer" title="Edit">
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                               </button>
                               <button onClick={() => handleDelete(room.id)} className="p-2 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer" title="Hapus">
@@ -515,6 +736,7 @@ export default function AdminDataProperti() {
           </div>
         </main>
 
+<<<<<<< HEAD
         {/* MODAL EDIT/TAMBAH PROPERTI & DOKUMEN SEWA */}
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
@@ -523,6 +745,16 @@ export default function AdminDataProperti() {
               <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-[#FAF5EF]">
                 <h3 className="text-lg font-bold text-slate-800">
                   {formData.id ? 'Edit Data Properti & Dokumen Sewa' : 'Tambah Properti & Dokumen Sewa'}
+=======
+        {/* ================= MODAL EDIT/TAMBAH PROPERTI ================= */}
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden my-8 max-h-[90vh] flex flex-col">
+              
+              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-[#FAF5EF]">
+                <h3 className="text-lg font-bold text-slate-800">
+                  {formData.id ? 'Edit Data Properti' : 'Tambah Properti Baru'}
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
                 </h3>
                 <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-rose-500 p-1 cursor-pointer">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -541,12 +773,20 @@ export default function AdminDataProperti() {
                   <input type="file" accept="image/*" onChange={handleImageChange} className="w-full text-sm text-slate-500 cursor-pointer" />
                 </div>
 
+<<<<<<< HEAD
                 {/* 2. FOTO GALERI */}
+=======
+                {/* 2. FOTO GALERI / RUANGAN TAMBAHAN (MULTIPLE) */}
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
                 <div className="pt-2 border-t border-slate-100">
                   <label className="block text-sm font-semibold text-slate-700 mb-1">
                     Foto Galeri / Ruangan (Bisa Pilih Banyak)
                   </label>
                   
+<<<<<<< HEAD
+=======
+                  {/* Grid Preview Galeri */}
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
                   {galleryPreviews.length > 0 && (
                     <div className="mb-2 grid grid-cols-4 gap-2 border border-slate-200 p-2 rounded-lg bg-slate-50 max-h-36 overflow-y-auto">
                       {galleryPreviews.map((src, idx) => (
@@ -574,6 +814,12 @@ export default function AdminDataProperti() {
                     onChange={handleGalleryChange} 
                     className="w-full text-sm text-slate-500 cursor-pointer" 
                   />
+<<<<<<< HEAD
+=======
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    *Tahan tombol <b>Ctrl</b> atau <b>Shift</b> saat memilih gambar untuk mengunggah lebih dari satu foto sekaligus.
+                  </p>
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
                 </div>
 
                 <div>
@@ -600,9 +846,24 @@ export default function AdminDataProperti() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
+<<<<<<< HEAD
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Harga / Bln (Rp)</label>
                     <input required type="number" name="price_per_month" value={formData.price_per_month} onChange={handleChange} placeholder="1500000" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm" />
+=======
+                  {/* INPUT HARGA BERFORMAT TITIK RIBUAN AUTOMATIS */}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Harga / Bln (Rp)</label>
+                    <input 
+                      required 
+                      type="text" 
+                      name="display_price" 
+                      value={formData.display_price} 
+                      onChange={handlePriceChange} 
+                      placeholder="1.500.000" 
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-800" 
+                    />
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Status Properti</label>
@@ -626,6 +887,7 @@ export default function AdminDataProperti() {
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Fasilitas Kamar (Utama)</label>
                   <textarea name="facilities" value={formData.facilities} onChange={handleChange} rows="2" placeholder="Contoh: AC, Kasur Springbed, Meja Belajar, Lemari Baju, Kamar Mandi Dalam" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm"></textarea>
+<<<<<<< HEAD
                 </div>
 
                 <div>
@@ -679,6 +941,23 @@ export default function AdminDataProperti() {
                   <p className="text-[11px] text-slate-500 italic">
                     *Isi dokumen ini akan dijadikan draf utama saat penyewa menyewa properti ini.
                   </p>
+=======
+                  <p className="text-[11px] text-slate-400 mt-0.5">*Pisahkan dengan koma (,)</p>
+                </div>
+
+                {/* FASILITAS BERSAMA */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Fasilitas Bersama</label>
+                  <textarea name="public_facilities" value={formData.public_facilities} onChange={handleChange} rows="2" placeholder="Contoh: WiFi, Dapur Bersama, Kulkas, Parkiran Motor, Ruang Tamu" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm"></textarea>
+                  <p className="text-[11px] text-slate-400 mt-0.5">*Pisahkan dengan koma (,)</p>
+                </div>
+
+                {/* ATURAN KOS */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Aturan Kos / Properti</label>
+                  <textarea name="rules" value={formData.rules} onChange={handleChange} rows="2" placeholder="Contoh: Jam bertamu s/d jam 22.00, Dilarang merokok di dalam kamar, Dilarang membawa hewan peliharaan" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm"></textarea>
+                  <p className="text-[11px] text-slate-400 mt-0.5">*Pisahkan dengan koma (,)</p>
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
                 </div>
 
                 <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
@@ -686,7 +965,11 @@ export default function AdminDataProperti() {
                     Batal
                   </button>
                   <button disabled={submitting} type="submit" className="px-5 py-2.5 text-sm font-bold text-white bg-[#B38E5D] hover:bg-[#8F6E45] rounded-lg disabled:opacity-50 cursor-pointer">
+<<<<<<< HEAD
                     {submitting ? 'Menyimpan...' : 'Simpan Properti & Dokumen'}
+=======
+                    {submitting ? 'Menyimpan...' : 'Simpan Data'}
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
                   </button>
                 </div>
               </form>
@@ -694,7 +977,11 @@ export default function AdminDataProperti() {
           </div>
         )}
 
+<<<<<<< HEAD
         {/* MODAL KELOLA UNIT KAMAR */}
+=======
+        {/* ================= MODAL KELOLA UNIT KAMAR ================= */}
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
         {isRoomModalOpen && selectedProperty && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
             <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden my-8 max-h-[85vh] flex flex-col">

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../api'; // Sesuaikan path Axios instance kamu
 import SidebarUser from '../components/SidebarUser';
+import { AlertCircle, MessageSquare, Search, RefreshCw, X, Printer } from 'lucide-react';
 
 // =========================================================================
 // 🛠️ HELPER: PARSING TANGGAL AMAN UNTUK JAVASCRIPT
@@ -9,7 +10,6 @@ import SidebarUser from '../components/SidebarUser';
 const safeParseDate = (dateInput) => {
   if (!dateInput) return null;
   if (typeof dateInput === 'string') {
-    // Mengubah spasi MySQL menjadi 'T' agar valid dibaca semua browser (ISO-8601)
     const formattedStr = dateInput.replace(' ', 'T');
     const date = new Date(formattedStr);
     return isNaN(date.getTime()) ? null : date;
@@ -173,13 +173,16 @@ export default function RiwayatTransaksi() {
           
           metodePembayaran: item.pembayaran?.payment_method || 'Belum Dipilih',
           
+          // 🔴 ALASAN PENOLAKAN DARI ADMIN
+          alasanPenolakan: item.alasan_penolakan || 'Pemesanan tidak dapat disetujui saat ini.',
+
           // Status
           status: isExpired ? 'Expired' : statusDb,
           
           // Boolean Flags
-          isLunas: statusLower === 'dikonfirmasi' || statusLower === 'selesai' || statusLower === 'aktif',
+          isLunas: ['dikonfirmasi', 'selesai', 'aktif', 'lunas'].includes(statusLower),
           isTertunda: (statusLower === 'tertunda' || statusLower === 'menunggu pembayaran') && !isExpired,
-          isDitolak: statusLower === 'ditolak' || statusLower === 'batal',
+          isDitolak: statusLower === 'ditolak' || statusLower === 'batal' || statusLower === 'cancel',
           isExpired: isExpired,
           
           // Gambar properti
@@ -286,7 +289,7 @@ export default function RiwayatTransaksi() {
               {transaksiList.map((item) => (
                 <div 
                   key={item.id} 
-                  className="bg-white border border-[#D7C4B0] overflow-hidden shadow-sm hover:shadow-md transform hover:-translate-y-1 transition-all duration-300 rounded-xl"
+                  className="bg-white border border-[#D7C4B0] overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 rounded-xl"
                 >
                   {/* HEAD CARD */}
                   <div className="bg-[#FAF5EF]/50 px-6 py-4 border-b border-[#D7C4B0] flex flex-wrap justify-between items-center gap-2">
@@ -342,7 +345,10 @@ export default function RiwayatTransaksi() {
                           <span className="text-[#2D2321] font-semibold">{item.tanggalMasuk}</span>
                         </div>
                         
+<<<<<<< HEAD
                         {/* TANGGAL KELUAR / BATAS KONTRAK */}
+=======
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
                         <div>
                           <span className="text-[#B38E5D] block text-[10px] uppercase tracking-wider font-bold">Batas Kontrak:</span>
                           <span className="text-emerald-700 font-bold">{item.tanggalKeluar}</span>
@@ -359,6 +365,40 @@ export default function RiwayatTransaksi() {
                       </div>
                     </div>
                   </div>
+
+                  {/* 🔴 ALERT BOX PENOLAKAN ADMIN (MUNCUL KHUSUS JIKA STATUS DITOLAK) */}
+                  {item.isDitolak && (
+                    <div className="mx-6 mb-4 p-4 bg-rose-50 border border-rose-200 rounded-xl space-y-3">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <h4 className="text-xs font-bold text-rose-900 uppercase tracking-wider">Pemesanan Ditolak oleh Admin</h4>
+                          <p className="text-xs text-rose-700 leading-relaxed">
+                            <strong>Alasan Penolakan:</strong> "{item.alasanPenolakan}"
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* CTA Buttons Pendukung Sisi User */}
+                      <div className="pt-2 border-t border-rose-200/60 flex flex-wrap gap-2">
+                        <button 
+                          onClick={() => navigate('/carihunian')}
+                          className="px-4 py-2 bg-[#2D2321] hover:bg-[#B38E5D] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                        >
+                          <Search className="w-3.5 h-3.5" /> Cari Kamar Lain
+                        </button>
+                        
+                        <a 
+                          href={`https://wa.me/6281234567890?text=${encodeURIComponent(`Halo Admin Kafana Vista, saya ingin bertanya mengenai penolakan booking saya pada unit ${item.namaProperti} (${item.id}).`)}`}
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-xs"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" /> Hubungi Admin via WA
+                        </a>
+                      </div>
+                    </div>
+                  )}
 
                   {/* FOOTER CARD & ACTION */}
                   <div className="bg-[#FAF5EF]/50 px-6 py-4 border-t border-[#D7C4B0] flex flex-wrap justify-between items-center gap-4">
@@ -399,10 +439,10 @@ export default function RiwayatTransaksi() {
                         </button>
                       ) : item.isExpired ? (
                         <button 
-                          onClick={() => navigate('/')}
-                          className="bg-slate-200 text-slate-700 font-bold px-5 py-2 text-xs tracking-widest uppercase hover:bg-slate-300 transition-colors cursor-pointer rounded"
+                          onClick={() => navigate('/carihunian')}
+                          className="bg-slate-200 text-slate-700 font-bold px-5 py-2 text-xs tracking-widest uppercase hover:bg-slate-300 transition-colors cursor-pointer rounded flex items-center gap-1"
                         >
-                          🔄 BOOKING ULANG
+                          <RefreshCw className="w-3 h-3" /> BOOKING ULANG
                         </button>
                       ) : (
                         <button 
@@ -452,7 +492,10 @@ export default function RiwayatTransaksi() {
                   <span className="font-semibold">{selectedStruk.tanggalMasuk}</span>
                 </div>
                 
+<<<<<<< HEAD
                 {/* TANGGAL KELUAR DI STRUK */}
+=======
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
                 <div className="flex justify-between text-emerald-800 bg-emerald-50 px-2 py-1 rounded">
                   <span className="font-bold">Batas Kontrak:</span>
                   <span className="font-bold">{selectedStruk.tanggalKeluar}</span>
@@ -487,9 +530,9 @@ export default function RiwayatTransaksi() {
               <div className="mt-6 flex gap-2 font-sans">
                 <button 
                   onClick={() => window.print()}
-                  className="flex-1 bg-[#2D2321] text-white py-2.5 text-xs font-bold uppercase tracking-wider hover:bg-[#B38E5D] rounded transition-colors cursor-pointer"
+                  className="flex-1 bg-[#2D2321] text-white py-2.5 text-xs font-bold uppercase tracking-wider hover:bg-[#B38E5D] rounded transition-colors cursor-pointer flex justify-center items-center gap-1"
                 >
-                  🖨️ Cetak / PDF
+                  <Printer className="w-3.5 h-3.5" /> Cetak / PDF
                 </button>
                 <button 
                   onClick={() => setSelectedStruk(null)}

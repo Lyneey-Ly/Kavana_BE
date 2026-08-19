@@ -33,7 +33,9 @@ import Footer from './components/footer';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import PusatBantuanuser from './pages/pusatbantuanuser';
 import PusatBantuanAdmin from './pages/pusatbantuanadmin';
+import AdminRoomChat from './pages/AdminRoomChat';
 import Beranda from './pages/beranda';
+
 
 // Mengambil Client ID dari environment variable Vite (.env)
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "PASTE_GOOGLE_CLIENT_ID_DI_SINI";
@@ -85,6 +87,8 @@ export default function App() {
             <Route path="/admin/dokumen-sewa/:id" element={<AdminDokumenSewa />} />
             <Route path="/NotificationBell" element={<NotificationBell />} />
             <Route path="/pusatbantuanadmin" element={<PusatBantuanAdmin />} /> 
+            <Route path="/AdminRoomChat" element={<AdminRoomChat/>} /> 
+
           </Routes>
         </div>
       </Router>

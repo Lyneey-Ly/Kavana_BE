@@ -44,7 +44,25 @@ Route::post('/auth/google', [AuthController::class, 'googleLogin']);
 */
 Route::middleware('auth:sanctum')->group(function () {
 
+<<<<<<< HEAD
     // --- AUTH & PROFILE USER ---
+=======
+    // --- 👑 SUPERADMIN ROUTES ---
+    Route::prefix('superadmin')->group(function () {
+        Route::get('/stats', [SuperAdminController::class, 'dashboardStats']);
+        Route::get('/platform-stats', [SuperAdminController::class, 'platformStats']);
+        Route::get('/administrators', [SuperAdminController::class, 'getAdministrators']);
+        Route::post('/administrators', [SuperAdminController::class, 'storeAdministrator']);
+        Route::delete('/administrators/{id}', [SuperAdminController::class, 'destroyAdministrator']);
+        Route::get('/users', [SuperAdminController::class, 'getUsers']);
+        Route::delete('/users/{id}', [SuperAdminController::class, 'destroyUser']);
+        Route::get('/admin-revenue', [SuperAdminController::class, 'adminRevenue']);
+        Route::get('/transactions', [SuperAdminController::class, 'allTransactions']);
+        Route::get('/admin-list', [SuperAdminController::class, 'adminList']);
+    });
+
+    // --- AUTH & PROFILE ---
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::post('/profile/update', [ProfileController::class, 'update']);
@@ -85,7 +103,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/dokumen-sewa', [DokumenSewaController::class, 'indexUser']);
     Route::post('/pemesanan/{id}/ttd', [PemesananController::class, 'saveSignature']);
 
+<<<<<<< HEAD
     // --- CHAT SYSTEM ---
+=======
+    // --- 💬 CHAT SYSTEM (SELARAS DENGAN ADMINROOMCHAT.JSX) ---
+>>>>>>> 29e83abdbe58caa3f8e06dede78358f183d7587e
     Route::post('/chat/direct', [ChatController::class, 'sendDirectMessage']);
     Route::get('/chat/direct/{receiverId}', [ChatController::class, 'getDirectMessages']);
     Route::get('/chat/my-active-properties', [ChatController::class, 'getMyActiveProperties']);
@@ -100,6 +122,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard', [DashboardAdminController::class, 'index']);
         Route::get('/profile', [AdminProfileController::class, 'show']);
         Route::post('/profile', [AdminProfileController::class, 'update']);
+        Route::post('/pemesanan/{id}/tolak', [PemesananController::class, 'rejectBooking']);
         
         // Kelola Properti
         Route::get('/properties', [PropertyController::class, 'indexAdmin']);
