@@ -36,10 +36,9 @@ import PusatBantuanAdmin from './pages/pusatbantuanadmin';
 import AdminRoomChat from './pages/AdminRoomChat';
 import AdminPaymentSettings from './pages/AdminPaymenSettings';
 import PembayaranAdmin from './pages/PembayaranAdmin';
+import RiwayatPembayaranAdmin from './pages/RiwayatPembayaranAdmin';
 import Beranda from './pages/beranda';
 
-
-// Mengambil Client ID dari environment variable Vite (.env)
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "PASTE_GOOGLE_CLIENT_ID_DI_SINI";
 
 export default function App() {
@@ -78,7 +77,6 @@ export default function App() {
 
             {/* Admin Routes */}
             <Route path="/AdminPaymentSettings" element={<AdminPaymentSettings/>} /> 
-
             <Route path="/adminprofile" element={<AdminProfile />} />
             <Route path="/admindashboard" element={<AdminDashboard />} />
             <Route path="/adminlaporan" element={<AdminLaporanKeuangan />} />
@@ -92,7 +90,11 @@ export default function App() {
             <Route path="/NotificationBell" element={<NotificationBell />} />
             <Route path="/pusatbantuanadmin" element={<PusatBantuanAdmin />} /> 
             <Route path="/AdminRoomChat" element={<AdminRoomChat/>} /> 
-            <Route path="/PembayaranAdmin/:id" element={<PembayaranAdmin/>} /> 
+
+            {/* Route Pembayaran Admin (Mendukung URL kapital maupun lowercase) */}
+            <Route path="/PembayaranAdmin/:id" element={<PembayaranAdmin />} /> 
+            <Route path="/admin/pembayaran/:id" element={<PembayaranAdmin />} /> 
+            <Route path="/admin/riwayat-pembayaran" element={<RiwayatPembayaranAdmin />} />
 
           </Routes>
         </div>

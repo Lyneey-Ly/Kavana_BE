@@ -18,10 +18,15 @@ class Properti extends Model
         'gender_type', 
         'price_per_month',
         'address',
-        'latitude',          // 👈 Tambahkan ini
-        'longitude',         // 👈 Tambahkan ini
+        'latitude',          
+        'longitude',         
         'facilities',
         'status',
+        'approval_status', // <-- Wajib ada agar tidak diabaikan saat update
+        'payment_proof',   // <-- Wajib ada untuk upload manual
+        'is_paid_slot',    // <-- Wajib ada untuk status lunas
+        'slot_fee',
+        'is_first_property',
         'main_image',
         'gallery_images',
         'description',
@@ -32,8 +37,8 @@ class Properti extends Model
 
     protected $casts = [
         'gallery_images' => 'array',
-        'latitude'       => 'float', // 👈 Konversi ke float/number untuk Leaflet
-        'longitude'      => 'float', // 👈 Konversi ke float/number untuk Leaflet
+        'latitude'       => 'float', 
+        'longitude'      => 'float', 
     ];
 
     public function pemilik()
@@ -46,13 +51,11 @@ class Properti extends Model
         return $this->hasMany(Pemesanan::class, 'properti_id');
     }
 
-    // 1 Kost punya Banyak Kamar (HasMany)
     public function kamars()
     {
         return $this->hasMany(Kamar::class, 'properti_id');
     }
 
-    // 1 Kost punya Banyak Chat Grup (HasMany)
     public function chats()
     {
         return $this->hasMany(Chat::class, 'properti_id');

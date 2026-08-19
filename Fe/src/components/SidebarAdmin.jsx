@@ -84,6 +84,7 @@ export default function SidebarAdmin({ children }) {
     { name: 'Dokumen Sewa', path: '/admin/dokumen-sewa', icon: FileText },
     { name: 'Pusat Bantuan', path: '/pusatbantuanadmin', icon: HelpCircle },
     { name: 'Room Chat', path: '/AdminRoomChat', icon: MessageSquare },
+    { name: 'Room Chat', path: '/admin/riwayat-pembayaran', icon: MessageSquare },
   ];
 
   // Helper Foto Profil

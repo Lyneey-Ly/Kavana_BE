@@ -116,8 +116,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/properties/{id}', [PropertyController::class, 'update']);
         Route::delete('/properties/{id}', [PropertyController::class, 'destroy']);
 
-        // Monetisasi Publikasi Properti Admin
+        // Monetisasi Publikasi Properti Admin & Gateway Integration
         Route::post('/properties/{id}/pay-gateway', [PembayaranController::class, 'payGateway']);
+        Route::post('/properties/{id}/gateway-success', [PembayaranController::class, 'updateGatewaySuccess']);
         Route::post('/properties/{id}/upload-proof', [PembayaranController::class, 'uploadProof']);
 
         // Kelola Kamar
