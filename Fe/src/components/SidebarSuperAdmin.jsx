@@ -1,39 +1,40 @@
-import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-export default function SidebarSuperAdmin({ children }) { // 👈 PERBAIKAN: Tambahkan parameter children
+const SUPERADMIN_ROUTES = ['overview', 'approval', 'administrators', 'users', 'revenue', 'revenue-analytics', 'bank-accounts', 'finance-tracker', 'transactions', 'settings'];
+
+export default function SidebarSuperAdmin({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
 
   const menuItems = [
-    { key: 'overview', label: 'Dashboard Utama', icon: '📊', path: '/SuperAdminDashboard' },
-    { key: 'approval', label: 'Persetujuan Properti', icon: '🏠', path: '/SuperAdminDashboard?tab=approval' },
-    { key: 'administrators', label: 'Kelola Pengelola', icon: '👥', path: '/SuperAdminDashboard?tab=administrators' },
-    { key: 'users', label: 'Monitoring User', icon: '👤', path: '/SuperAdminDashboard?tab=users' },
-    { key: 'revenue', label: 'Pendapatan Admin', icon: '💰', path: '/SuperAdminDashboard?tab=revenue' },
-    { key: 'transactions', label: 'Semua Transaksi', icon: '🧾', path: '/SuperAdminDashboard?tab=transactions' },
-    { key: 'settings', label: 'Pengaturan Website', icon: '⚙️', path: '/SuperAdminDashboard?tab=settings' },
-    { key: 'verifikasi', label: 'Verifikasi Properti', icon: '✅', path: '/VerifikasiPropertiSuperAdmin' }, 
+    { key: 'overview', label: 'Dashboard Utama', icon: '📊', path: '/superadmin/overview' },
+    { key: 'administrators', label: 'Kelola Pengelola', icon: '👥', path: '/superadmin/administrators' },
+    { key: 'users', label: 'Monitoring User', icon: '👤', path: '/superadmin/users' },
+    { key: 'revenue', label: 'Pendapatan Admin', icon: '💰', path: '/superadmin/revenue' },
+    { key: 'revenue-analytics', label: 'Analitik Pendapatan', icon: '📈', path: '/superadmin/revenue-analytics' },
+    { key: 'finance-tracker', label: 'Finance Tracker', icon: '💳', path: '/superadmin/finance-tracker' },
+    { key: 'bank-accounts', label: 'Rekening Bank', icon: '🏦', path: '/superadmin/bank-accounts' },
+    { key: 'transactions', label: 'Semua Transaksi', icon: '🧾', path: '/superadmin/transactions' },
+    { key: 'settings', label: 'Pengaturan Website', icon: '⚙️', path: '/superadmin/settings' },
+    { key: 'verifikasi', label: 'Verifikasi Properti', icon: '✅', path: '/VerifikasiPropertiSuperAdmin' },
     { key: 'iklan', label: 'Kelola Iklan Banner', icon: '📢', path: '/KelolaIklanSuperAdmin' },
     { key: 'profile-requests', label: 'Verifikasi Profil Admin', icon: '🛂', path: '/SuperAdminProfileRequests' },
   ];
 
   const getActiveTab = () => {
+    const path = location.pathname;
 
-    if (location.pathname === '/KelolaIklanSuperAdmin') return 'iklan';
+    if (path === '/KelolaIklanSuperAdmin') return 'iklan';
+    if (path === '/SuperAdminProfileRequests') return 'profile-requests';
+    if (path === '/VerifikasiPropertiSuperAdmin') return 'verifikasi';
 
-    if (location.pathname === '/SuperAdminProfileRequests') {
-      return 'profile-requests';
+    // Halaman berbasis route: /superadmin/{key}
+    const match = path.match(/^\/superadmin\/([^/]+)/);
+    if (match && SUPERADMIN_ROUTES.includes(match[1])) {
+      return match[1];
     }
 
-
-
-
-    if (location.pathname === '/VerifikasiPropertiSuperAdmin') {
-      return 'verifikasi';
-    }
-    const searchParams = new URLSearchParams(location.search);
-    return searchParams.get('tab') || 'overview';
+    return 'overview';
   };
 
   const activeTab = getActiveTab();
@@ -43,9 +44,7 @@ export default function SidebarSuperAdmin({ children }) { // 👈 PERBAIKAN: Tam
   };
 
   return (
-    // 👈 PERBAIKAN: Tambahkan div pembungkus utama dengan flex
     <div className="flex min-h-screen bg-[#FAF5EF]">
-      
       {/* SIDEBAR */}
       <aside className="fixed lg:sticky top-0 inset-y-0 left-0 z-40 w-64 h-screen bg-[#261C19] text-white flex flex-col shadow-xl transition-transform duration-300 ease-in-out">
         {/* Brand Logo */}
@@ -102,9 +101,8 @@ export default function SidebarSuperAdmin({ children }) { // 👈 PERBAIKAN: Tam
 
       {/* KONTEN HALAMAN UTAMA */}
       <main className="flex-1 w-full relative min-h-screen overflow-x-hidden">
-        {children} {/* 👈 Di sinilah halaman Verifikasi akan dimunculkan */}
+        {children}
       </main>
-
     </div>
   );
 }

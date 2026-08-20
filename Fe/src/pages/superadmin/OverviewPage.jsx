@@ -2,12 +2,24 @@ import { useState } from 'react';
 import useSuperAdminFetch from '../../hooks/useSuperAdminFetch';
 import { formatRupiah } from '../../utils/format';
 
-export default function OverviewTab() {
+export default function OverviewPage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
-  const { data: platformStats, loading, error, reload } = useSuperAdminFetch(
-    `/admin/superadmin/platform-stats?year=${selectedYear}`
+  const { data: statsData, loading: statsLoading, error: statsError, reload: reloadStats } = useSuperAdminFetch(
+    '/admin/superadmin/stats',
+    { transform: (d) => d?.data || {} }
   );
+  const { data: platformStats, loading: platformLoading, error: platformError, reload: reloadPlatform } =
+    useSuperAdminFetch(`/admin/superadmin/platform-stats?year=${selectedYear}`);
+
+  const stats = statsData || {};
+  const loading = statsLoading || platformLoading;
+  const error = statsError || platformError;
+
+  const handleRetry = () => {
+    reloadStats();
+    reloadPlatform();
+  };
 
   if (loading) {
     return (
@@ -23,7 +35,7 @@ export default function OverviewTab() {
       <div className="bg-white border border-[#D7C4B0] p-10 text-center rounded-2xl shadow-sm">
         <p className="text-rose-600 font-bold text-sm mb-3">Gagal memuat data performa platform.</p>
         <button
-          onClick={reload}
+          onClick={handleRetry}
           className="px-4 py-2 bg-[#B38E5D] text-white rounded-lg text-xs font-bold cursor-pointer"
         >
           🔄 Coba Lagi
@@ -37,6 +49,43 @@ export default function OverviewTab() {
 
   return (
     <div className="space-y-6">
+      {/* STATS CARDS (HANYA DITAMPILKAN DI HALAMAN OVERVIEW) */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white p-5 rounded-2xl border border-[#D7C4B0] shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Pencari Kost</p>
+            <h3 className="text-2xl font-black text-[#261C19]">{stats.total_users ?? '...'}</h3>
+          </div>
+          <div className="w-10 h-10 bg-[#FAF5EF] rounded-xl flex items-center justify-center text-xl border border-[#D7C4B0]/50">👥</div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-[#D7C4B0] shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Pemilik Kost</p>
+            <h3 className="text-2xl font-black text-[#261C19]">{stats.total_pemilik ?? '...'}</h3>
+          </div>
+          <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-xl border border-emerald-200">🏢</div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-[#D7C4B0] shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Okupansi Kamar</p>
+            <h3 className="text-2xl font-black text-[#261C19]">
+              {`${platformStats?.property_stats?.occupancy_rate || 0}%`}
+            </h3>
+          </div>
+          <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-xl border border-blue-200">🛏️</div>
+        </div>
+
+        <div className="bg-[#261C19] text-white p-5 rounded-2xl border border-[#3D2D29] shadow-lg flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-[#D7C4B0] uppercase tracking-wider mb-1">Superadmin</p>
+            <h3 className="text-2xl font-black text-[#FAF5EF]">{stats.total_superadmin ?? '...'}</h3>
+          </div>
+          <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-xl border border-white/20">🛡️</div>
+        </div>
+      </div>
+
       <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-[#D7C4B0]">
         <h2 className="font-bold text-[#261C19]">Performa Platform</h2>
         <div className="flex items-center gap-2 text-xs font-bold">

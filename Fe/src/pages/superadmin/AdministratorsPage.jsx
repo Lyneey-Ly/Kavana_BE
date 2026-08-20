@@ -3,8 +3,10 @@ import API from '../../api';
 import Swal from 'sweetalert2';
 import useSuperAdminFetch from '../../hooks/useSuperAdminFetch';
 import { formatAvatar } from '../../utils/format';
+import { useSuperAdminLayout } from '../../contexts/SuperAdminContext';
 
-export default function AdministratorsTab({ onStatsChanged, refreshSignal = 0 }) {
+export default function AdministratorsPage() {
+  const { refreshTick } = useSuperAdminLayout();
   const [adminRoleFilter, setAdminRoleFilter] = useState('');
 
   const url = adminRoleFilter
@@ -14,7 +16,7 @@ export default function AdministratorsTab({ onStatsChanged, refreshSignal = 0 })
   const { data, loading, error, reload } = useSuperAdminFetch(
     url,
     {
-      deps: [refreshSignal],
+      deps: [refreshTick],
       transform: (d) => {
         const raw = d?.data || [];
         return Array.isArray(raw) ? raw : [];
@@ -39,7 +41,6 @@ export default function AdministratorsTab({ onStatsChanged, refreshSignal = 0 })
         await API.delete(`/admin/superadmin/administrators/${id}`);
         Swal.fire('Terhapus!', 'Akun berhasil dihapus.', 'success');
         reload();
-        if (onStatsChanged) onStatsChanged();
       } catch (error) {
         Swal.fire('Gagal!', error.response?.data?.message || 'Terjadi kesalahan.', 'error');
       }

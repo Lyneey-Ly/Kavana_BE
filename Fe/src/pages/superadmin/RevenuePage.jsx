@@ -2,7 +2,7 @@ import { useState } from 'react';
 import useSuperAdminFetch from '../../hooks/useSuperAdminFetch';
 import { formatRupiah } from '../../utils/format';
 
-export default function RevenueTab() {
+export default function RevenuePage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const { data: revenueData, loading, error, reload } = useSuperAdminFetch(

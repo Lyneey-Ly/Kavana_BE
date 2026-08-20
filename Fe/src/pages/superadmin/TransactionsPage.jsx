@@ -11,10 +11,10 @@ const DEFAULT_FILTERS = {
   page: 1,
 };
 
-export default function TransactionsTab() {
+export default function TransactionsPage() {
   const [txFilters, setTxFilters] = useState(DEFAULT_FILTERS);
 
-  const { data: adminList = [] } = useSuperAdminFetch(
+  const { data: rawAdminList } = useSuperAdminFetch(
     '/admin/superadmin/admin-list',
     {
       transform: (d) => {
@@ -23,6 +23,9 @@ export default function TransactionsTab() {
       }
     }
   );
+
+  // Mencegah error jika rawAdminList bernilai null
+  const adminList = Array.isArray(rawAdminList) ? rawAdminList : [];
 
   const params = new URLSearchParams({
     page: txFilters.page,
@@ -37,13 +40,14 @@ export default function TransactionsTab() {
     `/admin/superadmin/transactions?${params.toString()}`,
     {
       transform: (d) => ({
-        transactions: d?.data?.transactions || [],
+        transactions: Array.isArray(d?.data?.transactions) ? d.data.transactions : [],
         pagination: d?.data?.pagination || {},
       })
     }
   );
 
-  const transactions = txData?.transactions || [];
+  // Mencegah error jika txData atau transactions bernilai null
+  const transactions = Array.isArray(txData?.transactions) ? txData.transactions : [];
   const pagination = txData?.pagination || {};
 
   const updateFilter = (patch) => {

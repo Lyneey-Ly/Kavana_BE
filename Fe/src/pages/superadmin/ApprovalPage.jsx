@@ -4,12 +4,13 @@ import Swal from 'sweetalert2';
 import useSuperAdminFetch from '../../hooks/useSuperAdminFetch';
 import { formatRupiah } from '../../utils/format';
 
-export default function ApprovalTab() {
+export default function ApprovalPage() {
   const [approvalFilter, setApprovalFilter] = useState('pending_payment');
 
   const { data, loading, error, reload } = useSuperAdminFetch(
     `/admin/superadmin/pending-properties?approval_status=${approvalFilter}`,
-    { transform: (d) => {
+    {
+      transform: (d) => {
         const raw = d?.data || [];
         return Array.isArray(raw) ? raw : [];
       }

@@ -329,6 +329,13 @@ class PembayaranController extends Controller
 
         $properti->approval_status = 'active';
         $properti->is_paid_slot = true; 
+
+        // Catat biaya slot yang dibayar (fallback: nilai site settings / 150000)
+        if (!$properti->slot_fee || (float)$properti->slot_fee <= 0) {
+            $setting = \App\Models\SiteSetting::first();
+            $properti->slot_fee = $setting ? (float)$setting->property_extra_fee : 150000;
+        }
+
         $properti->save();
 
         return response()->json([

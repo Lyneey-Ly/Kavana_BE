@@ -23,10 +23,12 @@ class SiteSetting extends Model
         'social_instagram',
         'social_tiktok',
         'property_extra_fee',
+        'platform_commission_percent',
     ];
 
     protected $casts = [
-        'property_extra_fee' => 'decimal:2',
+        'property_extra_fee'           => 'decimal:2',
+        'platform_commission_percent'  => 'decimal:2',
     ];
 
     public static function defaults(): array
@@ -43,6 +45,7 @@ class SiteSetting extends Model
             'social_instagram'   => 'https://instagram.com/kafanavista',
             'social_tiktok'      => 'https://tiktok.com/@kafanavista',
             'property_extra_fee' => 150000,
+            'platform_commission_percent' => 3.00,
         ];
     }
 }

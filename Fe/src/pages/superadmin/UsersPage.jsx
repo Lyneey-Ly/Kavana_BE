@@ -2,7 +2,7 @@ import API from '../../api';
 import Swal from 'sweetalert2';
 import useSuperAdminFetch from '../../hooks/useSuperAdminFetch';
 
-export default function UsersTab({ onStatsChanged }) {
+export default function UsersPage() {
   const { data, loading, error, reload } = useSuperAdminFetch(
     '/admin/superadmin/users',
     {
@@ -30,7 +30,6 @@ export default function UsersTab({ onStatsChanged }) {
         await API.delete(`/admin/superadmin/users/${id}`);
         Swal.fire('Terhapus!', 'User berhasil dihapus.', 'success');
         reload();
-        if (onStatsChanged) onStatsChanged();
       } catch (error) {
         Swal.fire('Gagal!', error.response?.data?.message || 'Terjadi kesalahan.', 'error');
       }

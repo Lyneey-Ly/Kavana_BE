@@ -176,6 +176,20 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/profile-requests/{id}/approve', [SuperAdminController::class, 'approveProfileRequest']);
             Route::post('/profile-requests/{id}/reject', [SuperAdminController::class, 'rejectProfileRequest']);
 
+            // --- REKENING BANK RESMI SUPERADMIN ---
+            Route::get('/bank-accounts', [SuperAdminController::class, 'getBankAccounts']);
+            Route::post('/bank-accounts', [SuperAdminController::class, 'storeBankAccount']);
+            Route::post('/bank-accounts/{id}', [SuperAdminController::class, 'storeBankAccount']);
+            Route::delete('/bank-accounts/{id}', [SuperAdminController::class, 'destroyBankAccount']);
+
+            // --- FINANCE TRACKER SUPERADMIN ---
+            Route::get('/finance-tracker', [SuperAdminController::class, 'getFinanceTracker']);
+            Route::post('/finance-tracker', [SuperAdminController::class, 'storeFinanceRecord']);
+            Route::delete('/finance-tracker/{id}', [SuperAdminController::class, 'destroyFinanceRecord']);
+
+            // --- ANALITIK PENDAPATAN SUPERADMIN (TRIPLE MONETIZATION) ---
+            Route::get('/revenue-analytics', [SuperAdminController::class, 'revenueAnalytics']);
+
             // --- KELOLA VENDOR ADVERTISEMENT (IKLAN) ---
             Route::get('/vendor-ads', [VendorAdController::class, 'index']);
             Route::post('/vendor-ads', [VendorAdController::class, 'store']);

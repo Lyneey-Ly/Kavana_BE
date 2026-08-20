@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import API from '../api';
+import { useState, useEffect } from 'react';
+import API from '../../api';
 import Swal from 'sweetalert2';
 
 const DEFAULT_VALUES = {
@@ -14,6 +14,7 @@ const DEFAULT_VALUES = {
   social_instagram: '',
   social_tiktok: '',
   property_extra_fee: 150000,
+  platform_commission_percent: 3.00,
 };
 
 const inputClass =
@@ -21,27 +22,33 @@ const inputClass =
 
 const labelClass = 'text-sm font-bold text-slate-700';
 
-export default function SiteSettingsForm() {
+export default function SettingsPage() {
   const [formData, setFormData] = useState(DEFAULT_VALUES);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const fetchSettings = useCallback(async () => {
-    try {
-      const res = await API.get('/site-settings');
-      const data = res.data?.data || {};
-      setFormData({ ...DEFAULT_VALUES, ...data, site_logo: data.site_logo || '' });
-    } catch (err) {
-      console.error('Gagal memuat pengaturan website', err);
-      Swal.fire('Gagal', 'Gagal memuat data pengaturan website.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    fetchSettings();
-  }, [fetchSettings]);
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await API.get('/site-settings');
+        if (cancelled) return;
+        const data = res.data?.data || {};
+        setFormData({ ...DEFAULT_VALUES, ...data, site_logo: data.site_logo || '' });
+      } catch (err) {
+        if (cancelled) return;
+        console.error('Gagal memuat pengaturan website', err);
+        Swal.fire('Gagal', 'Gagal memuat data pengaturan website.', 'error');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -55,6 +62,7 @@ export default function SiteSettingsForm() {
       const res = await API.post('/admin/site-settings', {
         ...formData,
         property_extra_fee: Number(formData.property_extra_fee) || 0,
+        platform_commission_percent: Number(formData.platform_commission_percent) || 0,
       });
 
       setFormData((prev) => ({ ...prev, ...res.data?.data }));
@@ -152,6 +160,20 @@ export default function SiteSettingsForm() {
               min={0}
               className={inputClass}
             />
+          </div>
+          <div className="space-y-2">
+            <label className={labelClass}>Komisi Platform per Booking (%)</label>
+            <input
+              type="number"
+              name="platform_commission_percent"
+              value={formData.platform_commission_percent}
+              onChange={handleChange}
+              min={0}
+              max={100}
+              step="0.01"
+              className={inputClass}
+            />
+            <p className="text-[10px] text-slate-400">Persentase komisi yang dipotong dari setiap booking kost terkonfirmasi.</p>
           </div>
         </div>
       </section>

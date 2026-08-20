@@ -116,7 +116,7 @@ export default function Login() {
     await kafanaSuccess('Login Berhasil! 🎉', `Selamat datang kembali, ${welcomeMessage}.`);
 
     switch (role) {
-      case 'superadmin': navigate('/SuperAdminDashboard'); break;
+      case 'superadmin': navigate('/superadmin/overview'); break;
       case 'admin': navigate('/admindashboard'); break;
       default: navigate('/beranda');
     }

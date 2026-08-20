@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import API from '../api'; // Axios instance terkonfigurasi (dengan Auth Token)
 import SidebarAdmin from '../components/SidebarAdmin';
+import { getMediaUrl } from '../utils/storage';
 import {
   Building2,
   MessageSquare,
@@ -16,11 +17,21 @@ import {
 
 export default function AdminRoomChat() {
   // State Data Properti, Chat & User Login
-  const [currentUser, setCurrentUser] = useState(null);
+  // Inisialisasi user dari localStorage tanpa setState di dalam effect
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const storedUser = localStorage.getItem('user');
+      if (!storedUser) return null;
+      const parsed = JSON.parse(storedUser);
+      return parsed.data || parsed;
+    } catch {
+      return null;
+    }
+  });
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [messages, setMessages] = useState([]);
-  
+
   // State UI, Filter & Loading
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingProperties, setLoadingProperties] = useState(true);
@@ -31,12 +42,26 @@ export default function AdminRoomChat() {
 
   // Ref untuk Auto-Scroll Chat Box
   const chatScrollRef = useRef(null);
+  // Flag: HANYA auto-scroll saat user berada di bawah / setelah aksi kirim / load awal
+  const shouldAutoScrollRef = useRef(true);
 
   // Auto-Scroll ke Pesan Terbawah
   const scrollToBottom = () => {
     if (chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
+  };
+
+  // Deteksi posisi scroll: apakah user berada di paling bawah (threshold 80px)
+  const isNearBottom = () => {
+    const el = chatScrollRef.current;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  };
+
+  // Saat user scroll manual, update flag auto-scroll mengikuti posisinya
+  const handleChatScroll = () => {
+    shouldAutoScrollRef.current = isNearBottom();
   };
 
   // Helper Format Waktu (HH:mm)
@@ -52,26 +77,25 @@ export default function AdminRoomChat() {
   // 0. AMBIL DATA USER/ADMIN YANG SEDANG LOGIN
   // =========================================================================
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
-        setCurrentUser(parsed.data || parsed);
-      } catch (e) {
-        console.error('Gagal membaca data user dari storage:', e);
-      }
-    }
+    let cancelled = false;
 
-    // Ambil profil user terbaru dari backend
-    API.get('/user')
-      .then((res) => {
+    (async () => {
+      try {
+        const res = await API.get('/user');
+        if (cancelled) return;
         const userData = res.data.data || res.data;
         if (userData) {
           setCurrentUser(userData);
           localStorage.setItem('user', JSON.stringify(userData));
         }
-      })
-      .catch((err) => console.error('Gagal mengambil profil user:', err));
+      } catch (err) {
+        console.error('Gagal mengambil profil user:', err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // =========================================================================
@@ -106,10 +130,12 @@ export default function AdminRoomChat() {
     try {
       const response = await API.get(`/chat/group/${propertiId}`);
       const chatData = response.data.data || response.data || [];
-      
+
       setMessages(chatData);
 
       if (!isSilent) {
+        // Load awal / ganti properti: paksa scroll ke bawah
+        shouldAutoScrollRef.current = true;
         setTimeout(scrollToBottom, 100);
       }
     } catch (err) {
@@ -121,18 +147,23 @@ export default function AdminRoomChat() {
 
   // Fetch Awal Data Properti
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchManagedProperties();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch Pesan saat Properti Aktif Berubah
   useEffect(() => {
     if (selectedProperty) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchGroupChatMessages(selectedProperty.id);
     }
   }, [selectedProperty, fetchGroupChatMessages]);
 
   // =========================================================================
   // 3. POLLING SYSTEM (Auto Refresh Pesan & Properti tiap 4 Detik)
+  //    Auto-scroll HANYA berjalan saat user berada di paling bawah (tidak
+  //    mengganggu saat user sedang membaca pesan di atas).
   // =========================================================================
   useEffect(() => {
     const interval = setInterval(() => {
@@ -146,8 +177,10 @@ export default function AdminRoomChat() {
   }, [selectedProperty, fetchGroupChatMessages, fetchManagedProperties]);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages.length]);
+    if (shouldAutoScrollRef.current) {
+      scrollToBottom();
+    }
+  }, [messages]);
 
   // =========================================================================
   // 4. HANDLER KIRIM PESAN OLEH ADMIN / PENGELOLA
@@ -166,6 +199,7 @@ export default function AdminRoomChat() {
         message: messageText
       });
 
+      shouldAutoScrollRef.current = true;
       await fetchGroupChatMessages(selectedProperty.id, true);
       scrollToBottom();
     } catch (err) {
@@ -180,18 +214,24 @@ export default function AdminRoomChat() {
   // =========================================================================
   // 5. HELPER PENGECEKAN IDENTITAS PENGIRIM (ADMIN/OWNER VS PENGHUNI)
   // =========================================================================
+  const extractSenderId = (msg) =>
+    msg?.user_id ?? msg?.user?.id ?? msg?.sender_id ?? msg?.sender?.id ?? null;
+
+  const extractSenderRole = (msg) =>
+    String(msg?.user?.role || msg?.sender?.role || msg?.role || msg?.sender_role || '').toLowerCase();
+
   const checkIsOwner = (msg) => {
     if (!msg) return false;
 
     // 1. Flag eksplisit dari backend
-    if (msg.is_owner === true || msg.is_owner === 1 || msg.is_owner === '1' || msg.is_owner === 'true') {
+    if ([true, 1, '1', 'true'].includes(msg.is_owner)) {
       return true;
     }
 
-    // Ekstraksi ID Pengirim
-    const msgUserId = msg.user_id ?? msg.user?.id ?? msg.sender_id;
+    // Ekstraksi ID Pengirim (konsisten dari berbagai bentuk response)
+    const msgUserId = extractSenderId(msg);
 
-    // 2. Cocokkan ID Pengirim dengan ID Admin yang sedang login
+    // 2. Cocokkan ID Pengirim dengan ID Admin yang sedang login (safe compare)
     const currentUserId = currentUser?.id ?? currentUser?.data?.id;
     if (currentUserId != null && msgUserId != null && String(currentUserId) === String(msgUserId)) {
       return true;
@@ -203,8 +243,8 @@ export default function AdminRoomChat() {
       return true;
     }
 
-    // 4. Cek Role dari object user / msg
-    const role = (msg.user?.role || msg.role || msg.sender_role || '').toLowerCase();
+    // 4. Cek Role dari object user / sender / msg
+    const role = extractSenderRole(msg);
     if (['admin', 'owner', 'superadmin', 'super_admin', 'pengelola'].includes(role)) {
       return true;
     }
@@ -213,19 +253,33 @@ export default function AdminRoomChat() {
   };
 
   const getSenderName = (msg, isOwner) => {
-    if (!msg) return 'Penghuni';
-    if (msg.user?.name) return msg.user.name;
-    if (msg.sender_name) return msg.sender_name;
-    if (msg.name) return msg.name;
+    if (!msg) return isOwner ? 'Pengelola Properti' : 'Penghuni';
 
+    // Rantai fallback fleksibel untuk berbagai variasi response backend
+    const name = msg.user?.name || msg.sender?.name || msg.sender_name || msg.user_name || msg.name;
+    if (name) return name;
+
+    // Terakhir: nama admin yang sedang login (jika cocok dengan ID pengirim)
     const currentUserId = currentUser?.id ?? currentUser?.data?.id;
-    const msgUserId = msg.user_id ?? msg.user?.id ?? msg.sender_id;
-
+    const msgUserId = extractSenderId(msg);
     if (currentUserId != null && msgUserId != null && String(currentUserId) === String(msgUserId)) {
-      return currentUser?.name || currentUser?.data?.name || 'Pak Ahmad (Owner)';
+      return currentUser?.name || currentUser?.data?.name || 'Pengelola Properti';
     }
 
+    // Fallback role tanpa hardcoded nama
     return isOwner ? 'Pengelola Properti' : 'Penghuni';
+  };
+
+  const getSenderAvatar = (msg) => {
+    const avatar =
+      msg?.user?.avatar ||
+      msg?.user?.foto_profil ||
+      msg?.sender?.avatar ||
+      msg?.sender?.foto_profil ||
+      msg?.avatar ||
+      msg?.foto_profil ||
+      null;
+    return getMediaUrl(avatar);
   };
 
   // Filter Properti berdasarkan Pencarian
@@ -239,7 +293,7 @@ export default function AdminRoomChat() {
   return (
     <SidebarAdmin>
       <div className="h-screen bg-[#FAF5EF] text-[#261C19] flex flex-col font-sans selection:bg-[#B38E5D] selection:text-white overflow-hidden">
-        
+
         {/* HEADER SECTION */}
         <div className="bg-white border-b border-[#E5D7C5] px-6 py-4 flex flex-wrap justify-between items-center gap-4 shrink-0 shadow-xs">
           <div>
@@ -279,7 +333,7 @@ export default function AdminRoomChat() {
 
         {/* MAIN SPLIT-PANE CONTAINER */}
         <div className="flex-1 flex overflow-hidden">
-          
+
           {/* PANEL KIRI: DAFTAR PROPERTI KELOLAAN */}
           <div className="w-full md:w-80 lg:w-96 bg-white border-r border-[#E5D7C5] flex flex-col shrink-0">
             <div className="p-4 border-b border-[#E5D7C5] bg-[#FAF5EF]/40">
@@ -392,6 +446,7 @@ export default function AdminRoomChat() {
                 {/* CONTAINER LIST PESAN */}
                 <div
                   ref={chatScrollRef}
+                  onScroll={handleChatScroll}
                   className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4"
                 >
                   {loadingChat ? (
@@ -403,29 +458,25 @@ export default function AdminRoomChat() {
                     messages.map((msg, index) => {
                       const isOwner = checkIsOwner(msg);
                       const senderName = getSenderName(msg, isOwner);
-                      const avatarUrl = msg.user?.avatar || msg.user?.foto_profil 
-                        ? (msg.user.avatar || msg.user.foto_profil).startsWith('http')
-                          ? (msg.user.avatar || msg.user.foto_profil)
-                          : `http://127.0.0.1:8000/storage/${msg.user.avatar || msg.user.foto_profil}`
-                        : null;
+                      const avatarUrl = getSenderAvatar(msg);
 
                       return (
                         <div
-                          key={msg.id || `msg-${index}`}
+                          key={`${msg.id ?? index}-${msg.created_at ?? ''}`}
                           className={`flex gap-3 max-w-[85%] md:max-w-[70%] ${
                             isOwner ? 'ml-auto flex-row-reverse' : 'mr-auto'
                           }`}
                         >
                           {/* AVATAR PENGIRIM */}
                           <div className={`w-8 h-8 rounded-full shrink-0 overflow-hidden border flex items-center justify-center font-black text-xs shadow-xs ${
-                            isOwner 
-                              ? 'bg-[#261C19] text-[#B38E5D] border-[#B38E5D]' 
+                            isOwner
+                              ? 'bg-[#261C19] text-[#B38E5D] border-[#B38E5D]'
                               : 'bg-amber-100 text-[#261C19] border-[#E5D7C5]'
                           }`}>
                             {avatarUrl ? (
                               <img src={avatarUrl} alt={senderName} className="w-full h-full object-cover" />
                             ) : (
-                              senderName.charAt(0).toUpperCase()
+                              (senderName || '?').charAt(0).toUpperCase()
                             )}
                           </div>
 

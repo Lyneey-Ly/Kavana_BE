@@ -9,6 +9,10 @@ use App\Models\Pemesanan;
 use App\Models\Properti;
 use App\Models\Pembayaran;
 use App\Models\AdminProfileRequest;
+use App\Models\VendorAdvertisement;
+use App\Models\SuperAdminBankAccount;
+use App\Models\SuperAdminFinance;
+use App\Models\SiteSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -564,6 +568,12 @@ class SuperAdminController extends Controller
         // TAMBAHKAN INI: Jika di-approve (active), otomatis tandai slot sudah lunas
         if ($request->approval_status === 'active') {
             $property->is_paid_slot = true;
+
+            // Catat biaya slot yang dibayar (fallback: nilai site settings / 150000)
+            if (!$property->slot_fee || (float)$property->slot_fee <= 0) {
+                $setting = SiteSetting::first();
+                $property->slot_fee = $setting ? (float)$setting->property_extra_fee : 150000;
+            }
         }
 
         $property->save();
@@ -741,6 +751,304 @@ class SuperAdminController extends Controller
             'status'  => 'success',
             'message' => 'Pengajuan perubahan profil ditolak.',
             'data'    => $profileRequest->fresh()
+        ], 200);
+    }
+
+    /**
+     * 12. REKENING BANK RESMI SUPERADMIN (Tujuan Pembayaran Pemilik Kost & Vendor)
+     */
+    public function getBankAccounts(Request $request)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
+        $accounts = SuperAdminBankAccount::orderBy('is_active', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function ($account) {
+                return [
+                    'id'             => $account->id,
+                    'bank_name'      => $account->bank_name,
+                    'account_number' => $account->account_number,
+                    'account_holder' => $account->account_holder,
+                    'qris_image_url' => $account->qris_image ? asset('storage/' . $account->qris_image) : null,
+                    'is_active'      => (bool)$account->is_active,
+                    'created_at'     => $account->created_at,
+                    'updated_at'     => $account->updated_at,
+                ];
+            });
+
+        return response()->json([
+            'status' => 'success',
+            'count'  => $accounts->count(),
+            'data'   => $accounts
+        ], 200);
+    }
+
+    public function storeBankAccount(Request $request, $id = null)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
+        $request->validate([
+            'bank_name'      => 'required|string|max:100',
+            'account_number' => 'required|string|max:50',
+            'account_holder' => 'required|string|max:150',
+            'qris_image'     => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+            'is_active'      => 'sometimes|boolean',
+        ]);
+
+        $account = null;
+        if ($id) {
+            $account = SuperAdminBankAccount::find($id);
+            if (!$account) {
+                return response()->json(['message' => 'Rekening bank tidak ditemukan'], 404);
+            }
+        }
+
+        $data = [
+            'bank_name'      => $request->bank_name,
+            'account_number' => $request->account_number,
+            'account_holder' => $request->account_holder,
+            'is_active'      => $request->boolean('is_active', $account ? $account->is_active : true),
+        ];
+
+        if ($request->hasFile('qris_image')) {
+            if ($account && $account->qris_image && Storage::disk('public')->exists($account->qris_image)) {
+                Storage::disk('public')->delete($account->qris_image);
+            }
+            $data['qris_image'] = $request->file('qris_image')->store('bank_qris', 'public');
+        }
+
+        if ($account) {
+            $account->update($data);
+            $message = 'Rekening bank berhasil diperbarui!';
+        } else {
+            $account = SuperAdminBankAccount::create($data);
+            $message = 'Rekening bank berhasil ditambahkan!';
+        }
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => $message,
+            'data'    => $account
+        ], $id ? 200 : 201);
+    }
+
+    public function destroyBankAccount(Request $request, $id)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
+        $account = SuperAdminBankAccount::find($id);
+
+        if (!$account) {
+            return response()->json(['message' => 'Rekening bank tidak ditemukan'], 404);
+        }
+
+        if ($account->qris_image && Storage::disk('public')->exists($account->qris_image)) {
+            Storage::disk('public')->delete($account->qris_image);
+        }
+
+        $account->delete();
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Rekening bank berhasil dihapus.'
+        ], 200);
+    }
+
+    /**
+     * 13. FINANCE TRACKER SUPERADMIN (Arus Kas Pemasukan & Pengeluaran Operasional)
+     */
+    public function getFinanceTracker(Request $request)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
+        $query = SuperAdminFinance::query();
+
+        if ($request->filled('year')) {
+            $query->whereYear('transaction_date', $request->year);
+        }
+        if ($request->filled('month')) {
+            $query->whereMonth('transaction_date', $request->month);
+        }
+        if ($request->filled('category') && in_array($request->category, ['slot_fee', 'vendor_ad', 'commission', 'operational_cost', 'other'])) {
+            $query->where('category', $request->category);
+        }
+        if ($request->filled('type') && in_array($request->type, ['income', 'expense'])) {
+            $query->where('type', $request->type);
+        }
+
+        $perPage = $request->get('per_page', 20);
+        $records = $query->orderBy('transaction_date', 'desc')->orderBy('created_at', 'desc')->paginate($perPage);
+
+        $summary = [
+            'total_income'  => (float)(clone $query)->where('type', 'income')->sum('amount'),
+            'total_expense' => (float)(clone $query)->where('type', 'expense')->sum('amount'),
+        ];
+        $summary['balance'] = round($summary['total_income'] - $summary['total_expense'], 2);
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => [
+                'records'    => $records->items(),
+                'summary'    => $summary,
+                'pagination' => [
+                    'current_page' => $records->currentPage(),
+                    'last_page'    => $records->lastPage(),
+                    'per_page'     => $records->perPage(),
+                    'total'        => $records->total(),
+                ],
+            ]
+        ], 200);
+    }
+
+    public function storeFinanceRecord(Request $request)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
+        $request->validate([
+            'type'             => 'required|in:income,expense',
+            'category'         => 'required|in:slot_fee,vendor_ad,commission,operational_cost,other',
+            'amount'           => 'required|numeric|min:0',
+            'description'      => 'nullable|string|max:1000',
+            'transaction_date' => 'required|date',
+            'proof_file'       => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+        ]);
+
+        $data = [
+            'type'             => $request->type,
+            'category'         => $request->category,
+            'amount'           => $request->amount,
+            'description'      => $request->description,
+            'transaction_date' => $request->transaction_date,
+        ];
+
+        if ($request->hasFile('proof_file')) {
+            $data['proof_file'] = $request->file('proof_file')->store('finance_proofs', 'public');
+        }
+
+        $record = SuperAdminFinance::create($data);
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Catatan keuangan berhasil disimpan.',
+            'data'    => $record
+        ], 201);
+    }
+
+    public function destroyFinanceRecord(Request $request, $id)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
+        $record = SuperAdminFinance::find($id);
+
+        if (!$record) {
+            return response()->json(['message' => 'Catatan keuangan tidak ditemukan'], 404);
+        }
+
+        if ($record->proof_file && Storage::disk('public')->exists($record->proof_file)) {
+            Storage::disk('public')->delete($record->proof_file);
+        }
+
+        $record->delete();
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Catatan keuangan berhasil dihapus.'
+        ], 200);
+    }
+
+    /**
+     * 14. ANALITIK PENDAPATAN SUPERADMIN (TRIPLE MONETIZATION)
+     * 3 Sumber pendapatan: Slot Properti + Iklan Vendor + Komisi Booking
+     */
+    public function revenueAnalytics(Request $request)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
+        $year = $request->get('year');
+
+        // 1. Pendapatan Slot Properti (Listing Fee)
+        $slotQuery = Properti::where('is_paid_slot', true);
+        if ($year) {
+            $slotQuery->whereYear('updated_at', $year);
+        }
+        $totalSlotRevenue = (float)$slotQuery->sum('slot_fee');
+        $paidSlots = (int)$slotQuery->count();
+
+        // 2. Pendapatan Iklan Vendor (Banner Ads)
+        $adQuery = VendorAdvertisement::where('is_active', true);
+        if ($year) {
+            $adQuery->whereYear('created_at', $year);
+        }
+        $totalVendorAdRevenue = (float)$adQuery->sum('price');
+        $activeAds = (int)$adQuery->count();
+
+        // 3. Komisi Booking Kost (Platform Fee, persentase dari site_settings)
+        $setting = SiteSetting::first();
+        $commissionPercent = $setting ? (float)$setting->platform_commission_percent : 3.00;
+
+        $bookingQuery = Pemesanan::where('status', 'Dikonfirmasi');
+        if ($year) {
+            $bookingQuery->whereYear('created_at', $year);
+        }
+        $totalBookingValue = (float)$bookingQuery->sum('total_price');
+        $confirmedBookings = (int)$bookingQuery->count();
+        $totalCommissionRevenue = round($totalBookingValue * $commissionPercent / 100, 2);
+
+        // 4. Pengeluaran Operasional & Pemasukan Manual (Finance Tracker)
+        $expenseQuery = SuperAdminFinance::where('type', 'expense');
+        $incomeQuery = SuperAdminFinance::where('type', 'income');
+        if ($year) {
+            $expenseQuery->whereYear('transaction_date', $year);
+            $incomeQuery->whereYear('transaction_date', $year);
+        }
+        $totalExpenses = (float)$expenseQuery->sum('amount');
+        $totalManualIncome = (float)$incomeQuery->sum('amount');
+
+        // Total Pendapatan Kasar & Laba Bersih
+        $totalGrossIncome = round($totalSlotRevenue + $totalVendorAdRevenue + $totalCommissionRevenue + $totalManualIncome, 2);
+        $netProfit = round($totalGrossIncome - $totalExpenses, 2);
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => [
+                'year'              => $year ? (int)$year : null,
+                'total_gross_income' => $totalGrossIncome,
+                'income_breakdown'  => [
+                    'total_slot_revenue'        => $totalSlotRevenue,
+                    'total_vendor_ad_revenue'   => $totalVendorAdRevenue,
+                    'total_commission_revenue'  => $totalCommissionRevenue,
+                    'total_manual_income'       => $totalManualIncome,
+                ],
+                'commission_info'   => [
+                    'commission_percent'   => $commissionPercent,
+                    'total_booking_value'  => $totalBookingValue,
+                    'confirmed_bookings'   => $confirmedBookings,
+                ],
+                'slot_info'         => [
+                    'paid_slots'   => $paidSlots,
+                    'slot_fee'     => $setting ? (float)$setting->property_extra_fee : 150000,
+                ],
+                'ad_info'           => [
+                    'active_ads' => $activeAds,
+                ],
+                'total_expenses'    => $totalExpenses,
+                'net_profit'        => $netProfit,
+            ]
         ], 200);
     }
 }

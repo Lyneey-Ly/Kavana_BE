@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // Pages Import
@@ -41,7 +41,17 @@ import KelolaIklanSuperAdmin from './pages/KelolaIklanSuperAdmin';
 import SuperAdminProfileRequests from './pages/SuperAdminProfileRequests';
 
 // Super Admin Pages Import
-import SuperAdminDashboard from './pages/SuperAdminDashboard';
+import SuperAdminLayout from './layouts/SuperAdminLayout';
+import OverviewPage from './pages/superadmin/OverviewPage';
+import ApprovalPage from './pages/superadmin/ApprovalPage';
+import AdministratorsPage from './pages/superadmin/AdministratorsPage';
+import UsersPage from './pages/superadmin/UsersPage';
+import RevenuePage from './pages/superadmin/RevenuePage';
+import TransactionsPage from './pages/superadmin/TransactionsPage';
+import RevenueAnalyticsPage from './pages/superadmin/RevenueAnalyticsPage';
+import BankAccountsPage from './pages/superadmin/BankAccountsPage';
+import FinanceTrackerPage from './pages/superadmin/FinanceTrackerPage';
+import SettingsPage from './pages/superadmin/SettingsPage';
 import VerifikasiPropertiSuperAdmin from './pages/VerifikasiPropertiSuperAdmin'; 
 
 // Components Import
@@ -105,7 +115,21 @@ export default function App() {
             <Route path="/admin/riwayat-pembayaran" element={<RiwayatPembayaranAdmin />} />
 
             {/* Super Admin Routes */}
-            <Route path="/SuperAdminDashboard" element={<SuperAdminDashboard />} /> 
+            <Route path="/superadmin" element={<SuperAdminLayout />}>
+              <Route index element={<Navigate to="/superadmin/overview" replace />} />
+              <Route path="overview" element={<OverviewPage />} />
+              <Route path="approval" element={<ApprovalPage />} />
+              <Route path="administrators" element={<AdministratorsPage />} />
+              <Route path="users" element={<UsersPage />} />
+              <Route path="revenue" element={<RevenuePage />} />
+              <Route path="transactions" element={<TransactionsPage />} />
+              <Route path="revenue-analytics" element={<RevenueAnalyticsPage />} />
+              <Route path="bank-accounts" element={<BankAccountsPage />} />
+              <Route path="finance-tracker" element={<FinanceTrackerPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+            </Route>
+            {/* Redirect dari URL lama berbasis query param (?tab=...) */}
+            <Route path="/SuperAdminDashboard" element={<Navigate to="/superadmin/overview" replace />} />
             <Route path="/VerifikasiPropertiSuperAdmin" element={<VerifikasiPropertiSuperAdmin />} />
             <Route path="/KelolaIklanSuperAdmin" element={<KelolaIklanSuperAdmin />} />
             <Route path="/SuperAdminProfileRequests" element={<SuperAdminProfileRequests />} />
