@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLocation, Outlet } from 'react-router-dom';
 import SidebarSuperAdmin from '../components/SidebarSuperAdmin';
 import AddAdminModal from '../components/superadmin/AddAdminModal';
+import SuperAdminNotificationBell from '../components/superadmin/SuperAdminNotificationBell';
 import { SuperAdminLayoutContext } from '../contexts/SuperAdminContext';
 
 const TAB_TITLES = {
@@ -63,12 +64,15 @@ export default function SuperAdminLayout() {
             </p>
           </div>
 
-          <button
-            onClick={() => setShowModal(true)}
-            className="bg-[#B38E5D] hover:bg-[#8F6E45] text-white px-5 py-3 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all shadow-md hover:scale-105 cursor-pointer flex items-center justify-center gap-2 self-start md:self-auto"
-          >
-            <span>➕</span> Tambah Pengelola Baru
-          </button>
+          <div className="flex items-center gap-3 self-start md:self-auto">
+            <SuperAdminNotificationBell />
+            <button
+              onClick={() => setShowModal(true)}
+              className="bg-[#B38E5D] hover:bg-[#8F6E45] text-white px-5 py-3 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all shadow-md hover:scale-105 cursor-pointer flex items-center justify-center gap-2"
+            >
+              <span>➕</span> Tambah Pengelola Baru
+            </button>
+          </div>
         </header>
 
         {/* KONTEN HALAMAN AKTIF (Outlet) */}

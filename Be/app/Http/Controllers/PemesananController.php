@@ -11,6 +11,7 @@ use App\Models\RiwayatStatusPemesanan;
 use App\Models\FinanceTracker;
 use App\Models\Notification;
 use App\Services\NotificationService;
+use App\Services\SuperAdminNotificationService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
@@ -199,6 +200,14 @@ class PemesananController extends Controller
                     'booking'
                 );
             }
+
+            // NOTIFIKASI: ke SuperAdmin (transaksi booking baru)
+            SuperAdminNotificationService::send(
+                'transaction',
+                'Transaksi Booking Baru',
+                ($user->name ?? 'Customer') . ' memesan "' . ($properti->title ?? $properti->nama_properti) . '" sebesar Rp ' . number_format($totalPrice, 0, ',', '.') . ' (menunggu pembayaran).',
+                '/superadmin/transactions'
+            );
 
             DB::commit();
 

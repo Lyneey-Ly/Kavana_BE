@@ -17,6 +17,7 @@ use App\Http\Controllers\FinanceTrackerController;
 use App\Http\Controllers\AdminProfileController;
 use App\Http\Controllers\RoomController;
 use App\Http\Controllers\Api\SuperAdminController;
+use App\Http\Controllers\Api\SuperAdminNotificationController;
 use App\Http\Controllers\VendorAdController; // <-- IMPORT BARU
 use App\Http\Middleware\EnsureIsAdmin; 
 use App\Http\Controllers\NotificationController;
@@ -196,6 +197,12 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/vendor-ads/{id}', [VendorAdController::class, 'show']);
             Route::post('/vendor-ads/{id}', [VendorAdController::class, 'update']); // Post dipakai untuk kirim multipart/form-data
             Route::delete('/vendor-ads/{id}', [VendorAdController::class, 'destroy']);
+
+            // --- NOTIFIKASI SUPERADMIN (POLLING) ---
+            Route::get('/notifications', [SuperAdminNotificationController::class, 'index']);
+            Route::patch('/notifications/{id}/read', [SuperAdminNotificationController::class, 'markAsRead']);
+            Route::patch('/notifications/mark-all-read', [SuperAdminNotificationController::class, 'markAllAsRead']);
+            Route::delete('/notifications/{id}', [SuperAdminNotificationController::class, 'destroy']);
         });
     });
 });

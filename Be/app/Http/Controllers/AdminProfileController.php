@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\Properti;
 use App\Models\Administrator;
 use App\Models\AdminProfileRequest;
+use App\Services\SuperAdminNotificationService;
 
 class AdminProfileController extends Controller
 {
@@ -156,6 +157,14 @@ class AdminProfileController extends Controller
                     'requested_data'   => $requestedData,
                     'rejection_reason' => null,
                 ]
+            );
+
+            // Notifikasi SuperAdmin: ada pengajuan perubahan profil admin
+            SuperAdminNotificationService::send(
+                'profile_request',
+                'Pengajuan Perubahan Profil Admin',
+                $admin->name . ' mengajukan perubahan profil (' . implode(', ', array_keys($requestedData)) . ') dan menunggu verifikasi Anda.',
+                '/SuperAdminProfileRequests'
             );
 
             return response()->json([

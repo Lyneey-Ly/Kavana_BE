@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Properti; 
+use App\Services\SuperAdminNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth; 
 use Illuminate\Support\Facades\Storage;
@@ -181,6 +182,16 @@ class PropertyController extends Controller
         ]);
 
         $property->load(['pemilik', 'kamars']);
+
+        // Notifikasi SuperAdmin: properti baru menunggu verifikasi / pembayaran slot
+        if (in_array($approvalStatus, ['pending_payment', 'waiting_verification'])) {
+            SuperAdminNotificationService::send(
+                'property_approval',
+                'Properti Baru Menunggu Verifikasi',
+                'Properti "' . $property->title . '" diajukan oleh ' . ($user->name ?? 'Pemilik Kost') . ' dan memerlukan peninjauan.',
+                '/superadmin/approval'
+            );
+        }
 
         return response()->json([
             'message' => 'Property created successfully!',

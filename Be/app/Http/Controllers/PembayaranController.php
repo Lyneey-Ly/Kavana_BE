@@ -10,6 +10,7 @@ use App\Models\Kamar;
 use App\Models\FinanceTracker;
 use App\Models\Administrator;
 use App\Services\NotificationService;
+use App\Services\SuperAdminNotificationService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
@@ -368,6 +369,14 @@ class PembayaranController extends Controller
         $properti->approval_status = 'waiting_verification';
         $properti->payment_proof   = $path;
         $properti->save();
+
+        // NOTIFIKASI: ke SuperAdmin (bukti pembayaran slot properti diunggah)
+        SuperAdminNotificationService::send(
+            'property_approval',
+            'Bukti Pembayaran Slot Diterima',
+            'Pemilik "' . ($properti->title ?? 'Properti') . '" mengunggah bukti pembayaran slot. Harap verifikasi.',
+            '/superadmin/approval'
+        );
 
         return response()->json([
             'message' => 'Bukti pembayaran berhasil diunggah!',

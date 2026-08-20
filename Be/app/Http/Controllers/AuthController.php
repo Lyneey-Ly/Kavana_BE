@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
+use App\Services\SuperAdminNotificationService;
 
 class AuthController extends Controller
 {
@@ -332,6 +333,14 @@ class AuthController extends Controller
             'password' => bcrypt($request->password),
             'role'     => 'admin',
         ]);
+
+        // Notifikasi SuperAdmin: pendaftaran pengelola baru
+        SuperAdminNotificationService::send(
+            'new_admin',
+            'Pengelola Baru Terdaftar',
+            $admin->name . ' (' . $admin->email . ') baru saja mendaftar sebagai pengelola kost.',
+            '/superadmin/administrators'
+        );
 
         return response()->json([
             'message' => 'Registrasi Admin Berhasil!',
