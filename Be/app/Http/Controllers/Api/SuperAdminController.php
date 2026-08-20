@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Pemesanan;
 use App\Models\Properti;
 use App\Models\Pembayaran;
+use App\Models\AdminProfileRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -543,7 +544,7 @@ class SuperAdminController extends Controller
         ], 200);
     }
 
-    public function updatePropertyApproval(Request $request, $id)
+   public function updatePropertyApproval(Request $request, $id)
     {
         if (!$this->isSuperAdmin($request)) {
             return $this->denyAccess();
@@ -559,12 +560,187 @@ class SuperAdminController extends Controller
         }
 
         $property->approval_status = $request->approval_status;
+        
+        // TAMBAHKAN INI: Jika di-approve (active), otomatis tandai slot sudah lunas
+        if ($request->approval_status === 'active') {
+            $property->is_paid_slot = true;
+        }
+
         $property->save();
 
         return response()->json([
             'status'  => 'success',
             'message' => "Status persetujuan properti berhasil diubah menjadi '{$property->approval_status}'.",
             'data'    => $property->fresh('pemilik')
+        ], 200);
+    }
+
+    /**
+     * 9. DAFTAR PENGAJUAN PERUBAHAN PROFIL ADMIN (PENDING)
+     */
+    public function getProfileRequests(Request $request)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
+        $status = $request->get('status', 'pending');
+
+        $requests = AdminProfileRequest::with('administrator')
+            ->where('status', $status)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $formatted = $requests->map(function ($req) {
+            $admin = $req->administrator;
+            return [
+                'id'               => $req->id,
+                'administrator_id' => $req->administrator_id,
+                'requested_data'   => $req->requested_data,
+                'status'           => $req->status,
+                'rejection_reason' => $req->rejection_reason,
+                'created_at'       => $req->created_at,
+                // Data lama (kondisi saat ini di database utama)
+                'current_data'     => $admin ? [
+                    'name'  => $admin->name,
+                    'email' => $admin->email,
+                    'phone' => $admin->phone,
+                    'foto'  => $admin->foto,
+                ] : null,
+                'administrator'    => $admin ? [
+                    'id'    => $admin->id,
+                    'name'  => $admin->name,
+                    'email' => $admin->email,
+                    'phone' => $admin->phone,
+                    'foto'  => $admin->foto,
+                    'role'  => $admin->role,
+                ] : null,
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'count'  => $formatted->count(),
+            'data'   => $formatted
+        ], 200);
+    }
+
+    /**
+     * 10. SETUJUI PENGAJUAN PERUBAHAN PROFIL ADMIN
+     * Pindahkan requested_data ke tabel administrators.
+     */
+    public function approveProfileRequest(Request $request, $id)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
+        $profileRequest = AdminProfileRequest::with('administrator')->find($id);
+
+        if (!$profileRequest) {
+            return response()->json(['message' => 'Pengajuan tidak ditemukan'], 404);
+        }
+
+        if ($profileRequest->status !== 'pending') {
+            return response()->json(['message' => 'Pengajuan ini sudah diproses sebelumnya.'], 400);
+        }
+
+        $admin = $profileRequest->administrator;
+        if (!$admin) {
+            return response()->json(['message' => 'Akun administrator tidak ditemukan.'], 404);
+        }
+
+        $newData = $profileRequest->requested_data;
+
+        if (isset($newData['name'])) {
+            $admin->name = $newData['name'];
+        }
+
+        if (isset($newData['email']) && $newData['email'] !== $admin->email) {
+            $exists = Administrator::where('email', $newData['email'])
+                ->where('id', '!=', $admin->id)
+                ->exists();
+
+            if ($exists) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => "Email '{$newData['email']}' sudah digunakan akun lain. Pengajuan tidak dapat disetujui."
+                ], 422);
+            }
+
+            $admin->email = $newData['email'];
+        }
+
+        if (isset($newData['phone'])) {
+            $admin->phone = $newData['phone'];
+        }
+
+        // Pindahkan foto dari temp_avatars/ ke folder avatars/ utama
+        if (isset($newData['foto']) && $newData['foto']) {
+            $tempPath = $newData['foto'];
+
+            if (Storage::disk('public')->exists($tempPath)) {
+                $oldFoto = $admin->foto;
+                $newFotoPath = 'avatars/admin_' . $admin->id . '_' . basename($tempPath);
+                Storage::disk('public')->move($tempPath, $newFotoPath);
+                $admin->foto = $newFotoPath;
+
+                if ($oldFoto && Storage::disk('public')->exists($oldFoto)) {
+                    Storage::disk('public')->delete($oldFoto);
+                }
+            }
+        }
+
+        $admin->save();
+
+        $profileRequest->status = 'approved';
+        $profileRequest->rejection_reason = null;
+        $profileRequest->save();
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Perubahan profil admin berhasil disetujui dan diterapkan.',
+            'data'    => $profileRequest->fresh('administrator')
+        ], 200);
+    }
+
+    /**
+     * 11. TOLAK PENGAJUAN PERUBAHAN PROFIL ADMIN
+     */
+    public function rejectProfileRequest(Request $request, $id)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->denyAccess();
+        }
+
+        $request->validate([
+            'rejection_reason' => 'required|string|max:1000',
+        ]);
+
+        $profileRequest = AdminProfileRequest::find($id);
+
+        if (!$profileRequest) {
+            return response()->json(['message' => 'Pengajuan tidak ditemukan'], 404);
+        }
+
+        if ($profileRequest->status !== 'pending') {
+            return response()->json(['message' => 'Pengajuan ini sudah diproses sebelumnya.'], 400);
+        }
+
+        // Bersihkan foto sementara di temp_avatars/ jika ada
+        $newData = $profileRequest->requested_data;
+        if (!empty($newData['foto']) && Storage::disk('public')->exists($newData['foto'])) {
+            Storage::disk('public')->delete($newData['foto']);
+        }
+
+        $profileRequest->status = 'rejected';
+        $profileRequest->rejection_reason = $request->rejection_reason;
+        $profileRequest->save();
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Pengajuan perubahan profil ditolak.',
+            'data'    => $profileRequest->fresh()
         ], 200);
     }
 }

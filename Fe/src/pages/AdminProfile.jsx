@@ -16,6 +16,7 @@ export default function AdminProfile() {
 
   const [admin, setAdmin] = useState(null);
   const [rooms, setRooms] = useState([]);
+  const [pendingRequest, setPendingRequest] = useState(null);
 
   const [formState, setFormState] = useState({
     name: '',
@@ -38,6 +39,7 @@ export default function AdminProfile() {
 
       setAdmin(apiAdmin);
       setRooms(apiRooms);
+      setPendingRequest(res.data?.pending_request || null);
 
       setFormState({
         name: apiAdmin?.name || '',
@@ -108,8 +110,8 @@ export default function AdminProfile() {
 
       Swal.fire({
         icon: 'success',
-        title: 'Foto Diperbarui!',
-        text: 'Foto profil berhasil diperbarui.',
+        title: 'Foto Diajukan!',
+        text: 'Foto profil baru telah diajukan dan sedang menunggu verifikasi SuperAdmin.',
         toast: true,
         position: 'top-end',
         showConfirmButton: false,
@@ -163,10 +165,14 @@ export default function AdminProfile() {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
+      const isPending = res.data?.data?.is_pending === true;
+
       Swal.fire({
         icon: 'success',
-        title: 'Berhasil!',
-        text: res.data?.message || 'Profil Admin berhasil diperbarui!',
+        title: isPending ? 'Pengajuan Terkirim!' : 'Berhasil!',
+        text: res.data?.message || (isPending
+          ? 'Perubahan profil Anda sedang menunggu verifikasi dari SuperAdmin.'
+          : 'Profil Admin berhasil diperbarui!'),
         confirmButtonColor: '#C5A059',
       });
 
@@ -199,6 +205,9 @@ export default function AdminProfile() {
     if (!number) return "Rp 0";
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(number);
   };
+
+  const isPending = !!(pendingRequest && Object.keys(pendingRequest).length > 0);
+  const pendingChanges = pendingRequest || {};
 
   return (
     <SidebarAdmin>
@@ -267,11 +276,12 @@ export default function AdminProfile() {
                     
                     <button 
                       type="button"
+                      disabled={isPending}
                       onClick={() => fileInputRef.current?.click()}
-                      className="absolute inset-0 rounded-full bg-black/75 opacity-0 group-hover:opacity-100 transition duration-300 flex flex-col items-center justify-center text-xs font-bold uppercase tracking-wider text-[#E5D7C5] gap-1.5 backdrop-blur-xs cursor-pointer border-2 border-[#C5A059]/50"
+                      className="absolute inset-0 rounded-full bg-black/75 opacity-0 group-hover:opacity-100 transition duration-300 flex flex-col items-center justify-center text-xs font-bold uppercase tracking-wider text-[#E5D7C5] gap-1.5 backdrop-blur-xs cursor-pointer border-2 border-[#C5A059]/50 disabled:cursor-not-allowed disabled:opacity-0"
                     >
                       <span className="text-xl">📷</span>
-                      <span>Ganti Foto</span>
+                      <span>{isPending ? 'Menunggu Verifikasi' : 'Ganti Foto'}</span>
                     </button>
 
                     <span className="absolute bottom-1.5 right-1.5 bg-gradient-to-r from-[#C5A059] to-[#8F6E45] text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg border border-[#1E1614]">
@@ -305,6 +315,7 @@ export default function AdminProfile() {
                   </div>
 
                   <button 
+                    disabled={isPending}
                     onClick={() => {
                       setIsEditing(!isEditing);
                       setFormState({
@@ -314,16 +325,70 @@ export default function AdminProfile() {
                         password: '',
                       });
                     }}
-                    className={`w-full px-6 py-3 rounded-xl font-extrabold text-xs md:text-sm uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer ${
-                      isEditing 
-                        ? 'bg-rose-900/80 hover:bg-rose-900 text-rose-100 border border-rose-700' 
-                        : 'bg-gradient-to-r from-[#C5A059] via-[#D4AF37] to-[#9C7A3C] hover:opacity-95 text-[#1E1614]'
+                    className={`w-full px-6 py-3 rounded-xl font-extrabold text-xs md:text-sm uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${
+                      isPending
+                        ? 'bg-amber-900/80 hover:bg-amber-900 text-amber-100 border border-amber-700'
+                        : isEditing 
+                          ? 'bg-rose-900/80 hover:bg-rose-900 text-rose-100 border border-rose-700' 
+                          : 'bg-gradient-to-r from-[#C5A059] via-[#D4AF37] to-[#9C7A3C] hover:opacity-95 text-[#1E1614]'
                     }`}
                   >
-                    {isEditing ? '✕ Batal Edit' : '✏️ Edit Identitas Admin'}
+                    {isPending ? '⏳ Menunggu Verifikasi SuperAdmin' : (isEditing ? '✕ Batal Edit' : '✏️ Edit Identitas Admin')}
                   </button>
                 </div>
               </div>
+
+              {/* ALERT STATUS PENGAJUAN PERUBAHAN PROFIL */}
+              {isPending && (
+                <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl shrink-0">⏳</span>
+                    <div className="flex-1">
+                      <h3 className="text-sm md:text-base font-extrabold text-amber-900">
+                        Perubahan profil Anda sedang menanti verifikasi dari SuperAdmin.
+                      </h3>
+                      <p className="text-xs md:text-sm text-amber-800/80 font-medium mt-1">
+                        Data berikut sedang dalam proses persetujuan dan belum aktif sampai disetujui:
+                      </p>
+                      <ul className="mt-3 space-y-1.5 text-xs md:text-sm font-semibold text-amber-900">
+                        {pendingChanges.name && pendingChanges.name !== admin?.name && (
+                          <li className="flex items-center gap-2">
+                            <span className="w-24 shrink-0 text-amber-700/70">Nama:</span>
+                            <span className="line-through opacity-60">{admin?.name}</span>
+                            <span>→</span>
+                            <span className="font-black">{pendingChanges.name}</span>
+                          </li>
+                        )}
+                        {pendingChanges.email && pendingChanges.email !== admin?.email && (
+                          <li className="flex items-center gap-2">
+                            <span className="w-24 shrink-0 text-amber-700/70">Email:</span>
+                            <span className="line-through opacity-60">{admin?.email}</span>
+                            <span>→</span>
+                            <span className="font-black">{pendingChanges.email}</span>
+                          </li>
+                        )}
+                        {pendingChanges.phone && pendingChanges.phone !== admin?.phone && (
+                          <li className="flex items-center gap-2">
+                            <span className="w-24 shrink-0 text-amber-700/70">No. HP:</span>
+                            <span className="line-through opacity-60">{admin?.phone}</span>
+                            <span>→</span>
+                            <span className="font-black">{pendingChanges.phone}</span>
+                          </li>
+                        )}
+                        {pendingChanges.foto && (
+                          <li className="flex items-center gap-2">
+                            <span className="w-24 shrink-0 text-amber-700/70">Foto:</span>
+                            <span className="font-black">📷 Foto profil baru</span>
+                          </li>
+                        )}
+                      </ul>
+                      <p className="mt-3 text-[11px] text-amber-700/70 font-bold">
+                        💡 Perubahan identitas baru tidak dapat diajukan sampai pengajuan ini diproses oleh SuperAdmin.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* FORM EDIT PROFIL ADMIN CARD */}
               <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E5D7C5] shadow-sm space-y-6">

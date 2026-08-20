@@ -4,40 +4,49 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 // Pages Import
 import LandingPage from './pages/landingpages';
 import Home from './pages/home';
+import Beranda from './pages/beranda';
 import UserProfile from './pages/profil';
-import AdminDashboard from './pages/admindashboard';
-import AdminDataProperti from './pages/admindataproperti';
 import CariHunian from './pages/carihunian';
 import Login from './pages/login';
 import Register from './pages/register';
-import AdminLaporanKeuangan from './pages/adminlaporan';
-import AdminTagihanOrder from './pages/adminTO';
-import AdminPenyewa from './pages/adminpenyewa';
-import AdminPengaturan from './pages/adminpengaturan';
 import Pembayaran from './pages/pembayaran';
 import FinanceTracker from './pages/FinanceTracker';
 import ChatRoom from './pages/roomchat';
 import KatalogProperti from './pages/katalogproperti';
 import PusatBantuan from './pages/PusatBantuan';
+import PusatBantuanuser from './pages/pusatbantuanuser';
 import Riwayat from './pages/riwayattransaksi';
 import Dokumen from './pages/DokumenSewa';
 import KomplainUser from './pages/KomplainUser';
-import AdminKomplain from './pages/AdminKomplain';
 import DetailKamar from './pages/detailkamar';
+import Testimoni from './pages/Testimoni';
+import Wishlist from './pages/whislist';
+
+// Admin Pages Import
+import AdminDashboard from './pages/admindashboard';
+import AdminDataProperti from './pages/admindataproperti';
+import AdminLaporanKeuangan from './pages/adminlaporan';
+import AdminTagihanOrder from './pages/adminTO';
+import AdminPenyewa from './pages/adminpenyewa';
+import AdminPengaturan from './pages/adminpengaturan';
+import AdminKomplain from './pages/AdminKomplain';
 import AdminProfile from './pages/AdminProfile'; 
 import AdminDokumenSewa from './pages/AdminDokumenSewa';
-import Testimoni from './pages/Testimoni';
-import NotificationBell from './components/NotificationBell';
-import Wishlist from './pages/whislist';
-import Footer from './components/footer';
-import SuperAdminDashboard from './pages/SuperAdminDashboard';
-import PusatBantuanuser from './pages/pusatbantuanuser';
 import PusatBantuanAdmin from './pages/pusatbantuanadmin';
 import AdminRoomChat from './pages/AdminRoomChat';
 import AdminPaymentSettings from './pages/AdminPaymenSettings';
 import PembayaranAdmin from './pages/PembayaranAdmin';
 import RiwayatPembayaranAdmin from './pages/RiwayatPembayaranAdmin';
-import Beranda from './pages/beranda';
+import KelolaIklanSuperAdmin from './pages/KelolaIklanSuperAdmin';
+import SuperAdminProfileRequests from './pages/SuperAdminProfileRequests';
+
+// Super Admin Pages Import
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
+import VerifikasiPropertiSuperAdmin from './pages/VerifikasiPropertiSuperAdmin'; 
+
+// Components Import
+import NotificationBell from './components/NotificationBell';
+import Footer from './components/footer';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "PASTE_GOOGLE_CLIENT_ID_DI_SINI";
 
@@ -52,7 +61,6 @@ export default function App() {
             <Route path="/home" element={<Home />} />
             <Route path="/beranda" element={<Beranda />} />
             <Route path="/landingpages" element={<LandingPage />} />
-            <Route path="/PusatBantuan" element={<PusatBantuan />} />
             <Route path="/katalogproperti" element={<KatalogProperti />} />
             
             {/* User Profile & Auth */}
@@ -71,30 +79,36 @@ export default function App() {
             <Route path="/testimoni" element={<Testimoni />} /> 
             <Route path="/whislist" element={<Wishlist />} /> 
             <Route path="/footer" element={<Footer />} /> 
-            <Route path="/SuperAdminDashboard" element={<SuperAdminDashboard />} /> 
+            <Route path="/PusatBantuan" element={<PusatBantuan />} />
             <Route path="/pusatbantuanuser" element={<PusatBantuanuser />} /> 
             <Route path="/dokumen-sewa/:id" element={<Dokumen />} />
 
             {/* Admin Routes */}
-            <Route path="/AdminPaymentSettings" element={<AdminPaymentSettings/>} /> 
             <Route path="/adminprofile" element={<AdminProfile />} />
             <Route path="/admindashboard" element={<AdminDashboard />} />
+            <Route path="/admin/properti" element={<AdminDataProperti />} />
             <Route path="/adminlaporan" element={<AdminLaporanKeuangan />} />
             <Route path="/adminTO" element={<AdminTagihanOrder />} />
             <Route path="/adminpenyewa" element={<AdminPenyewa />} />
             <Route path="/adminpengaturan" element={<AdminPengaturan />} />
-            <Route path="/admin/properti" element={<AdminDataProperti />} />
             <Route path="/admin/komplain" element={<AdminKomplain />} />
             <Route path="/admin/dokumen-sewa" element={<AdminDokumenSewa />} />
             <Route path="/admin/dokumen-sewa/:id" element={<AdminDokumenSewa />} />
-            <Route path="/NotificationBell" element={<NotificationBell />} />
-            <Route path="/pusatbantuanadmin" element={<PusatBantuanAdmin />} /> 
             <Route path="/AdminRoomChat" element={<AdminRoomChat/>} /> 
+            <Route path="/AdminPaymentSettings" element={<AdminPaymentSettings/>} /> 
+            <Route path="/pusatbantuanadmin" element={<PusatBantuanAdmin />} /> 
+            <Route path="/NotificationBell" element={<NotificationBell />} />
 
-            {/* Route Pembayaran Admin (Mendukung URL kapital maupun lowercase) */}
+            {/* Route Pembayaran Properti (Admin) */}
             <Route path="/PembayaranAdmin/:id" element={<PembayaranAdmin />} /> 
             <Route path="/admin/pembayaran/:id" element={<PembayaranAdmin />} /> 
             <Route path="/admin/riwayat-pembayaran" element={<RiwayatPembayaranAdmin />} />
+
+            {/* Super Admin Routes */}
+            <Route path="/SuperAdminDashboard" element={<SuperAdminDashboard />} /> 
+            <Route path="/VerifikasiPropertiSuperAdmin" element={<VerifikasiPropertiSuperAdmin />} />
+            <Route path="/KelolaIklanSuperAdmin" element={<KelolaIklanSuperAdmin />} />
+            <Route path="/SuperAdminProfileRequests" element={<SuperAdminProfileRequests />} />
 
           </Routes>
         </div>

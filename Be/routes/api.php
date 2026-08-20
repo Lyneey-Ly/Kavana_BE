@@ -17,9 +17,11 @@ use App\Http\Controllers\FinanceTrackerController;
 use App\Http\Controllers\AdminProfileController;
 use App\Http\Controllers\RoomController;
 use App\Http\Controllers\Api\SuperAdminController;
+use App\Http\Controllers\VendorAdController; // <-- IMPORT BARU
 use App\Http\Middleware\EnsureIsAdmin; 
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\WishlistController;
+use App\Http\Controllers\SiteSettingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -35,6 +37,12 @@ Route::get('/properties/{id}', [PropertyController::class, 'show']);
 Route::get('/properties/{propertiId}/reviews', [ReviewController::class, 'getByProperti']);
 Route::get('/testimonis', [TestimoniController::class, 'index']);
 Route::post('/auth/google', [AuthController::class, 'googleLogin']);
+
+// --- ENDPOINT PUBLIK VENDOR ADVERTISEMENTS ---
+Route::get('/vendor-ads/active', [VendorAdController::class, 'getActiveAds']);
+
+// --- ENDPOINT PUBLIK SITE SETTINGS (Dibaca Footer) ---
+Route::get('/site-settings', [SiteSettingController::class, 'index']);
 
 /*
 |--------------------------------------------------------------------------
@@ -107,6 +115,10 @@ Route::middleware('auth:sanctum')->group(function () {
         // Simpan / Update Pengaturan Pembayaran (Hanya Admin)
         Route::get('/payment-settings', [AdminProfileController::class, 'getPaymentSettings']);
         Route::post('/payment-settings', [AdminProfileController::class, 'updatePaymentSettings']);
+
+        // Pengaturan Website (Hanya Superadmin - dicek di controller)
+        Route::post('/site-settings', [SiteSettingController::class, 'update']);
+        Route::put('/site-settings', [SiteSettingController::class, 'update']);
         
         // Kelola Properti
         Route::get('/properties', [PropertyController::class, 'indexAdmin']);
@@ -158,6 +170,18 @@ Route::middleware('auth:sanctum')->group(function () {
             // --- VERIFIKASI & MONETISASI PROPERTI (SUPERADMIN) ---
             Route::get('/pending-properties', [SuperAdminController::class, 'getPendingProperties']);
             Route::patch('/properties/{id}/approval', [SuperAdminController::class, 'updatePropertyApproval']);
+
+            // --- VERIFIKASI PERUBAHAN PROFIL ADMIN (SUPERADMIN) ---
+            Route::get('/profile-requests', [SuperAdminController::class, 'getProfileRequests']);
+            Route::post('/profile-requests/{id}/approve', [SuperAdminController::class, 'approveProfileRequest']);
+            Route::post('/profile-requests/{id}/reject', [SuperAdminController::class, 'rejectProfileRequest']);
+
+            // --- KELOLA VENDOR ADVERTISEMENT (IKLAN) ---
+            Route::get('/vendor-ads', [VendorAdController::class, 'index']);
+            Route::post('/vendor-ads', [VendorAdController::class, 'store']);
+            Route::get('/vendor-ads/{id}', [VendorAdController::class, 'show']);
+            Route::post('/vendor-ads/{id}', [VendorAdController::class, 'update']); // Post dipakai untuk kirim multipart/form-data
+            Route::delete('/vendor-ads/{id}', [VendorAdController::class, 'destroy']);
         });
     });
 });

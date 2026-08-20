@@ -15,7 +15,8 @@ import {
 } from 'lucide-react';
 
 export default function AdminRoomChat() {
-  // State Data Properti & Chat
+  // State Data Properti, Chat & User Login
+  const [currentUser, setCurrentUser] = useState(null);
   const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -31,7 +32,7 @@ export default function AdminRoomChat() {
   // Ref untuk Auto-Scroll Chat Box
   const chatScrollRef = useRef(null);
 
-  // Helper Auto-Scroll ke Pesan Terbawah
+  // Auto-Scroll ke Pesan Terbawah
   const scrollToBottom = () => {
     if (chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
@@ -48,6 +49,32 @@ export default function AdminRoomChat() {
   };
 
   // =========================================================================
+  // 0. AMBIL DATA USER/ADMIN YANG SEDANG LOGIN
+  // =========================================================================
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        setCurrentUser(parsed.data || parsed);
+      } catch (e) {
+        console.error('Gagal membaca data user dari storage:', e);
+      }
+    }
+
+    // Ambil profil user terbaru dari backend
+    API.get('/user')
+      .then((res) => {
+        const userData = res.data.data || res.data;
+        if (userData) {
+          setCurrentUser(userData);
+          localStorage.setItem('user', JSON.stringify(userData));
+        }
+      })
+      .catch((err) => console.error('Gagal mengambil profil user:', err));
+  }, []);
+
+  // =========================================================================
   // 1. FETCH DAFTAR PROPERTI KELOLAAN ADMIN
   // =========================================================================
   const fetchManagedProperties = useCallback(async (isSilent = false) => {
@@ -58,14 +85,13 @@ export default function AdminRoomChat() {
       setProperties(data);
       setErrorMessage('');
 
-      // Auto-select properti pertama jika belum ada yang dipilih
       if (!selectedProperty && data.length > 0) {
         setSelectedProperty(data[0]);
       }
     } catch (err) {
       console.error('Gagal mengambil daftar properti kelolaan:', err);
       setErrorMessage('Gagal memuat daftar properti kelolaan.');
-    } fontFinally: {
+    } finally {
       if (!isSilent) setLoadingProperties(false);
     }
   }, [selectedProperty]);
@@ -83,7 +109,6 @@ export default function AdminRoomChat() {
       
       setMessages(chatData);
 
-      // Auto-scroll hanya jika tidak dalam mode silent polling (atau pengguna di posisi paling bawah)
       if (!isSilent) {
         setTimeout(scrollToBottom, 100);
       }
@@ -120,7 +145,6 @@ export default function AdminRoomChat() {
     return () => clearInterval(interval);
   }, [selectedProperty, fetchGroupChatMessages, fetchManagedProperties]);
 
-  // Scroll otomatis setiap kali jumlah pesan bertambah
   useEffect(() => {
     scrollToBottom();
   }, [messages.length]);
@@ -133,7 +157,7 @@ export default function AdminRoomChat() {
     if (!textInput.trim() || !selectedProperty || sending) return;
 
     const messageText = textInput.trim();
-    setTextInput(''); // Clear input duluan demi UX responsif
+    setTextInput('');
     setSending(true);
 
     try {
@@ -142,16 +166,66 @@ export default function AdminRoomChat() {
         message: messageText
       });
 
-      // Refresh riwayat pesan langsung
       await fetchGroupChatMessages(selectedProperty.id, true);
       scrollToBottom();
     } catch (err) {
       console.error('Gagal mengirim pesan pengelola:', err);
       alert('Gagal mengirim pesan. Pastikan koneksi server stabil.');
-      setTextInput(messageText); // Restore input jika gagal
+      setTextInput(messageText);
     } finally {
       setSending(false);
     }
+  };
+
+  // =========================================================================
+  // 5. HELPER PENGECEKAN IDENTITAS PENGIRIM (ADMIN/OWNER VS PENGHUNI)
+  // =========================================================================
+  const checkIsOwner = (msg) => {
+    if (!msg) return false;
+
+    // 1. Flag eksplisit dari backend
+    if (msg.is_owner === true || msg.is_owner === 1 || msg.is_owner === '1' || msg.is_owner === 'true') {
+      return true;
+    }
+
+    // Ekstraksi ID Pengirim
+    const msgUserId = msg.user_id ?? msg.user?.id ?? msg.sender_id;
+
+    // 2. Cocokkan ID Pengirim dengan ID Admin yang sedang login
+    const currentUserId = currentUser?.id ?? currentUser?.data?.id;
+    if (currentUserId != null && msgUserId != null && String(currentUserId) === String(msgUserId)) {
+      return true;
+    }
+
+    // 3. Cocokkan ID Pengirim dengan ID Pemilik Properti Terpilih
+    const propertyOwnerId = selectedProperty?.pemilik_id ?? selectedProperty?.owner_id;
+    if (propertyOwnerId != null && msgUserId != null && String(propertyOwnerId) === String(msgUserId)) {
+      return true;
+    }
+
+    // 4. Cek Role dari object user / msg
+    const role = (msg.user?.role || msg.role || msg.sender_role || '').toLowerCase();
+    if (['admin', 'owner', 'superadmin', 'super_admin', 'pengelola'].includes(role)) {
+      return true;
+    }
+
+    return false;
+  };
+
+  const getSenderName = (msg, isOwner) => {
+    if (!msg) return 'Penghuni';
+    if (msg.user?.name) return msg.user.name;
+    if (msg.sender_name) return msg.sender_name;
+    if (msg.name) return msg.name;
+
+    const currentUserId = currentUser?.id ?? currentUser?.data?.id;
+    const msgUserId = msg.user_id ?? msg.user?.id ?? msg.sender_id;
+
+    if (currentUserId != null && msgUserId != null && String(currentUserId) === String(msgUserId)) {
+      return currentUser?.name || currentUser?.data?.name || 'Pak Ahmad (Owner)';
+    }
+
+    return isOwner ? 'Pengelola Properti' : 'Penghuni';
   };
 
   // Filter Properti berdasarkan Pencarian
@@ -206,12 +280,8 @@ export default function AdminRoomChat() {
         {/* MAIN SPLIT-PANE CONTAINER */}
         <div className="flex-1 flex overflow-hidden">
           
-          {/* ========================================================================= */}
-          {/* 🏢 PANEL KIRI: DAFTAR PROPERTI KELOLAAN */}
-          {/* ========================================================================= */}
+          {/* PANEL KIRI: DAFTAR PROPERTI KELOLAAN */}
           <div className="w-full md:w-80 lg:w-96 bg-white border-r border-[#E5D7C5] flex flex-col shrink-0">
-            
-            {/* SEARCH BAR */}
             <div className="p-4 border-b border-[#E5D7C5] bg-[#FAF5EF]/40">
               <div className="relative">
                 <input
@@ -225,7 +295,6 @@ export default function AdminRoomChat() {
               </div>
             </div>
 
-            {/* PROPERTY CARDS LIST */}
             <div className="flex-1 overflow-y-auto divide-y divide-[#E5D7C5]/50">
               {loadingProperties ? (
                 <div className="p-8 text-center space-y-3">
@@ -236,7 +305,8 @@ export default function AdminRoomChat() {
                 filteredProperties.map((prop) => {
                   const isSelected = selectedProperty?.id === prop.id;
                   const lastMsg = prop.last_message || {};
-                  const senderName = lastMsg.user?.name || lastMsg.sender_name || 'Penghuni';
+                  const isLastMsgOwner = checkIsOwner(lastMsg);
+                  const senderName = getSenderName(lastMsg, isLastMsgOwner);
 
                   return (
                     <div
@@ -265,7 +335,6 @@ export default function AdminRoomChat() {
                         📍 {prop.address || prop.alamat || 'Lokasi tidak terdaftar'}
                       </p>
 
-                      {/* LAST MESSAGE PREVIEW */}
                       <div className="bg-white/80 p-2.5 rounded-lg border border-[#E5D7C5]/60 text-[11px] space-y-0.5">
                         <span className="font-bold text-[#B38E5D] block truncate">
                           {lastMsg.message ? `${senderName}:` : 'Belum ada obrolan'}
@@ -291,14 +360,10 @@ export default function AdminRoomChat() {
             </div>
           </div>
 
-          {/* ========================================================================= */}
-          {/* 💬 PANEL KANAN: MONITORING OBROLAN GRUP PROPERTI */}
-          {/* ========================================================================= */}
+          {/* PANEL KANAN: MONITORING OBROLAN GRUP PROPERTI */}
           <div className="flex-1 flex flex-col bg-[#FAF5EF]/30 relative overflow-hidden">
-            
             {selectedProperty ? (
               <>
-                {/* CHAT MONITOR HEADER */}
                 <div className="bg-white border-b border-[#E5D7C5] p-4 flex justify-between items-center shadow-xs z-10">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 bg-[#261C19] text-[#B38E5D] rounded-xl shadow-sm">
@@ -318,17 +383,16 @@ export default function AdminRoomChat() {
                     </div>
                   </div>
 
-                  {/* BADGE MONITORING */}
                   <div className="bg-[#261C19] text-[#FAF5EF] border border-[#B38E5D] px-3 py-1.5 rounded-xl text-xs font-black tracking-wider flex items-center gap-2 shadow-sm">
                     <Eye className="w-4 h-4 text-[#B38E5D] animate-pulse" />
                     <span>Mode Pemantauan Admin</span>
                   </div>
                 </div>
 
-                {/* CHAT MESSAGES AREA */}
+                {/* CONTAINER LIST PESAN */}
                 <div
                   ref={chatScrollRef}
-                  className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-pattern"
+                  className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4"
                 >
                   {loadingChat ? (
                     <div className="flex flex-col items-center justify-center h-full gap-2">
@@ -337,21 +401,27 @@ export default function AdminRoomChat() {
                     </div>
                   ) : messages.length > 0 ? (
                     messages.map((msg, index) => {
-                      const isOwner = msg.is_owner || msg.user?.role === 'admin' || msg.user?.role === 'owner';
-                      const senderName = msg.user?.name || msg.sender_name || 'Penghuni';
+                      const isOwner = checkIsOwner(msg);
+                      const senderName = getSenderName(msg, isOwner);
                       const avatarUrl = msg.user?.avatar || msg.user?.foto_profil 
-                        ? `http://127.0.0.1:8000/storage/${msg.user?.avatar || msg.user?.foto_profil}`
+                        ? (msg.user.avatar || msg.user.foto_profil).startsWith('http')
+                          ? (msg.user.avatar || msg.user.foto_profil)
+                          : `http://127.0.0.1:8000/storage/${msg.user.avatar || msg.user.foto_profil}`
                         : null;
 
                       return (
                         <div
-                          key={msg.id || index}
+                          key={msg.id || `msg-${index}`}
                           className={`flex gap-3 max-w-[85%] md:max-w-[70%] ${
                             isOwner ? 'ml-auto flex-row-reverse' : 'mr-auto'
                           }`}
                         >
-                          {/* AVATAR */}
-                          <div className="w-8 h-8 rounded-full shrink-0 overflow-hidden border border-[#E5D7C5] bg-white flex items-center justify-center text-[#261C19] font-black text-xs shadow-xs">
+                          {/* AVATAR PENGIRIM */}
+                          <div className={`w-8 h-8 rounded-full shrink-0 overflow-hidden border flex items-center justify-center font-black text-xs shadow-xs ${
+                            isOwner 
+                              ? 'bg-[#261C19] text-[#B38E5D] border-[#B38E5D]' 
+                              : 'bg-amber-100 text-[#261C19] border-[#E5D7C5]'
+                          }`}>
                             {avatarUrl ? (
                               <img src={avatarUrl} alt={senderName} className="w-full h-full object-cover" />
                             ) : (
@@ -359,15 +429,19 @@ export default function AdminRoomChat() {
                             )}
                           </div>
 
-                          {/* BUBBLE CONTENT */}
+                          {/* KONTEN GELEMBUNG PESAN */}
                           <div className={`space-y-1 ${isOwner ? 'text-right' : 'text-left'}`}>
-                            <div className="flex items-center gap-2 px-1">
+                            <div className={`flex items-center gap-2 px-1 ${isOwner ? 'justify-end' : 'justify-start'}`}>
                               <span className="text-[11px] font-bold text-[#261C19]">
                                 {senderName}
                               </span>
-                              {isOwner && (
+                              {isOwner ? (
                                 <span className="bg-[#261C19] text-[#B38E5D] border border-[#B38E5D]/40 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md flex items-center gap-1">
                                   <ShieldCheck className="w-3 h-3 text-[#B38E5D]" /> Pengelola
+                                </span>
+                              ) : (
+                                <span className="bg-slate-200 text-slate-700 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md">
+                                  Penghuni
                                 </span>
                               )}
                               <span className="text-[10px] text-slate-400 font-semibold">
@@ -375,7 +449,6 @@ export default function AdminRoomChat() {
                               </span>
                             </div>
 
-                            {/* BUBBLE BOX */}
                             <div
                               className={`p-3.5 rounded-2xl text-xs leading-relaxed shadow-xs ${
                                 isOwner
@@ -402,7 +475,7 @@ export default function AdminRoomChat() {
                   )}
                 </div>
 
-                {/* FORM BALASAN / MODERASI ADMIN */}
+                {/* FORM INPUT PESAN */}
                 <div className="p-4 bg-white border-t border-[#E5D7C5]">
                   <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
                     <input

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Properti;
 use App\Models\Administrator;
+use App\Models\AdminProfileRequest;
 
 class AdminProfileController extends Controller
 {
@@ -37,11 +38,18 @@ class AdminProfileController extends Controller
 
             $rooms = $query->latest()->get(); 
 
+            // Pengajuan perubahan profil yang sedang menunggu persetujuan SuperAdmin
+            $pendingRequest = AdminProfileRequest::where('administrator_id', $admin->id)
+                ->where('status', 'pending')
+                ->latest()
+                ->first();
+
             return response()->json([
-                'status'  => 'success',
-                'message' => 'Berhasil mengambil data profil admin',
-                'data'    => $admin,
-                'rooms'   => $rooms
+                'status'          => 'success',
+                'message'         => 'Berhasil mengambil data profil admin',
+                'data'            => $admin,
+                'rooms'           => $rooms,
+                'pending_request' => $pendingRequest ? $pendingRequest->requested_data : null,
             ], 200);
 
         } catch (\Throwable $th) {
@@ -54,6 +62,9 @@ class AdminProfileController extends Controller
 
     /**
      * Update Profil Admin
+     * - SuperAdmin: langsung update kolom di tabel administrators.
+     * - Admin biasa: data baru disimpan sebagai pengajuan (pending) untuk
+     *   diverifikasi SuperAdmin terlebih dahulu.
      */
     public function update(Request $request)
     {
@@ -69,43 +80,92 @@ class AdminProfileController extends Controller
 
             $request->validate([
                 'name'     => 'sometimes|required|string|max:255',
-                'email'    => 'sometimes|required|email|unique:' . $admin->getTable() . ',email,' . $admin->id,
+                'email'    => 'sometimes|required|email|unique:administrators,email,' . $admin->id,
                 'phone'    => 'nullable|string|max:20',
                 'password' => 'nullable|string|min:8',
                 'foto'     => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048'
             ]);
 
-            if ($request->has('name')) {
-                $admin->name = $request->name;
-            }
+            $role = strtolower($admin->role ?? '');
+            $isSuperAdmin = in_array($role, ['superadmin', 'super_admin']);
 
-            if ($request->has('email')) {
-                $admin->email = $request->email;
-            }
-
-            if ($request->has('phone')) {
-                $admin->phone = $request->phone;
-            }
-
-            if ($request->filled('password')) {
-                $admin->password = Hash::make($request->password);
-            }
-
-            if ($request->hasFile('foto')) {
-                if ($admin->foto && Storage::disk('public')->exists($admin->foto)) {
-                    Storage::disk('public')->delete($admin->foto);
+            // ============================================================
+            // A. SUPERADMIN -> PERUBAHAN LANGSUNG DITERAPKAN
+            // ============================================================
+            if ($isSuperAdmin) {
+                if ($request->has('name')) {
+                    $admin->name = $request->name;
                 }
 
-                $path = $request->file('foto')->store('avatars', 'public');
-                $admin->foto = $path;
+                if ($request->has('email')) {
+                    $admin->email = $request->email;
+                }
+
+                if ($request->has('phone')) {
+                    $admin->phone = $request->phone;
+                }
+
+                if ($request->filled('password')) {
+                    $admin->password = Hash::make($request->password);
+                }
+
+                if ($request->hasFile('foto')) {
+                    if ($admin->foto && Storage::disk('public')->exists($admin->foto)) {
+                        Storage::disk('public')->delete($admin->foto);
+                    }
+
+                    $path = $request->file('foto')->store('avatars', 'public');
+                    $admin->foto = $path;
+                }
+
+                $admin->save();
+
+                return response()->json([
+                    'status'  => 'success',
+                    'message' => 'Profil admin berhasil diperbarui!',
+                    'data'    => $admin
+                ], 200);
             }
 
-            $admin->save();
+            // ============================================================
+            // B. ADMIN BIASA -> BUAT PENGAJUAN PERUBAHAN (PENDING)
+            // ============================================================
+            $requestedData = [];
+            foreach (['name', 'email', 'phone'] as $field) {
+                if ($request->has($field)) {
+                    $requestedData[$field] = $request->{$field};
+                }
+            }
+
+            // Foto baru disimpan sementara di folder temp_avatars/
+            if ($request->hasFile('foto')) {
+                $tempFotoPath = $request->file('foto')->store('temp_avatars', 'public');
+                $requestedData['foto'] = $tempFotoPath;
+            }
+
+            // Password tetap diubah langsung (di luar lingkup verifikasi profil)
+            if ($request->filled('password')) {
+                $admin->password = Hash::make($request->password);
+                $admin->save();
+            }
+
+            // Jika masih ada pengajuan pending sebelumnya, perbarui; jika tidak, buat baru
+            $profileRequest = AdminProfileRequest::updateOrCreate(
+                ['administrator_id' => $admin->id, 'status' => 'pending'],
+                [
+                    'requested_data'   => $requestedData,
+                    'rejection_reason' => null,
+                ]
+            );
 
             return response()->json([
                 'status'  => 'success',
-                'message' => 'Profil admin berhasil diperbarui!',
-                'data'    => $admin
+                'message' => 'Perubahan profil berhasil diajukan dan sedang menunggu verifikasi dari SuperAdmin.',
+                'data'    => [
+                    'admin'           => $admin->fresh(),
+                    'profile_request' => $profileRequest,
+                    'is_pending'      => true,
+                ]
             ], 200);
 
         } catch (\Throwable $th) {
